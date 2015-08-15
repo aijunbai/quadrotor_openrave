@@ -44,6 +44,8 @@ def pv(*args, **kwargs):
             else sys.stderr
 
         print >> iostream, '%s%s: %s' % (prefix, name, pprint.pformat(val))
+        if 'pause' in kwargs:
+            raw_input('Enter to continue!')
 
 
 def mean(samples):
