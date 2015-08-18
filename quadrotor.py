@@ -19,7 +19,8 @@ def main(env, options):
     env.UpdatePublishedBodies()
 
     time.sleep(0.1)  # give time for environment to update
-    navi = navigation.NavigationPlanning(robot)
+    navi = navigation.Navigation(robot, verbose=options.verbose)
+    print navi
     navi.run()
 
 
@@ -32,8 +33,9 @@ def run(args=None):
     OpenRAVEGlobalArguments.addOptions(parser)
 
     parser.add_option('--scene',
-                      action="store", type='string', dest='scene', default='quadrotor.env.xml',
+                      action='store', type='string', dest='scene', default='quadrotor.env.xml',
                       help='Scene file to load (default=%default)')
+    parser.add_option('--verbose', action='store_true', dest='verbose', help='Set verbose output')
 
     (options, leftargs) = parser.parse_args(args=args)
     OpenRAVEGlobalArguments.parseAndCreateThreadedUser(options, main, defaultviewer=True)

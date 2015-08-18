@@ -2,25 +2,25 @@
     <velocityXYProportionalGain>5.0</velocityXYProportionalGain>
     <velocityXYIntegralGain>1.0</velocityXYIntegralGain>
     <velocityXYDifferentialGain>0.0</velocityXYDifferentialGain>
-    <velocityXYOutputLimit>10.0</velocityXYOutputLimit>
+    <velocityXYLimitOutput>10.0</velocityXYLimitOutput>
     <velocityXYTimeConstant>0.05</velocityXYTimeConstant>
 
     <velocityZProportionalGain>5.0</velocityZProportionalGain>
     <velocityZIntegralGain>1.0</velocityZIntegralGain>
     <velocityZDifferentialGain>0.0</velocityZDifferentialGain>
-    <velocityZOutputLimit>10.0</velocityZOutputLimit>
+    <velocityZLimitOutput>10.0</velocityZLimitOutput>
     <velocityZTimeConstant>0.05</velocityZTimeConstant>
 
     <rollpitchProportionalGain>10.0</rollpitchProportionalGain>
     <rollpitchIntegralGain>5.0</rollpitchIntegralGain>
     <rollpitchDifferentialGain>5.0</rollpitchDifferentialGain>
-    <rollpitchTimeConstant>0.05</rollpitchTimeConstant>
+    <rollpitchTimeConstant>0.01</rollpitchTimeConstant>
 
     <yawProportionalGain>5.0</yawProportionalGain>
     <yawIntegralGain>2.5</yawIntegralGain>
     <yawDifferentialGain>0.0</yawDifferentialGain>
-    <yawOutputLimit>3.0</yawOutputLimit>
-    <yawTimeConstant>0.05</yawTimeConstant>
+    <yawLimitOutput>3.0</yawLimitOutput>
+    <yawTimeConstant>0.1</yawTimeConstant>
     
     <loadFactorLimit>1.5</loadFactorLimit>
     <forceZLimit>30</forceZLimit>

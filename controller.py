@@ -7,30 +7,30 @@ import math
 import random
 import copy
 import pid
+import printable
 import numpy as np
 import openravepy as rave
-from thirdparty import addict
+import addict
 from tf import transformations
 
 
 __author__ = 'Aijun Bai'
 
 
-class Controller(object):
+class Controller(printable.Printable):
     def __init__(self, env, controller_conf, verbose=False):
+        super(Controller, self).__init__()
+
         self.env = env
         self.robot = env.GetRobots()[0]
         self.kinbody = self.env.GetKinBody(self.robot.GetName())
-
         self.physics_engine = env.GetPhysicsEngine()
-        self.velocity_command = None
 
         self.time_counter_for_drift_noise = 0.0
         self.drift_noise = [0.0, 0.0, 0.0, 0.0]
 
         conf = utils.Xml(controller_conf)
         self.controllers = addict.Dict()
-
         self.controllers.x = pid.PIDController(conf, 'velocityXY')
         self.controllers.y = pid.PIDController(conf, 'velocityXY')
         self.controllers.z = pid.PIDController(conf, 'velocityZ')
@@ -40,24 +40,21 @@ class Controller(object):
 
         self.motion_drift_noigse_time = conf.parse_float('motionDriftNoiseTime', 1.0)
         self.motion_small_noise = conf.parse_float('motionSmallNoise', 0.0)
-
         self.load_factor_limit = conf.parse_float('loadFactorLimit', -1.0)
         self.force_z_limit = conf.parse_float('forceZLimit', -1.0)
         self.torque_xy_limit = conf.parse_float('torqueXYLimit', -1.0)
         self.torque_z_limit = conf.parse_float('torqueZLimit', -1.0)
-
         self.dt = conf.parse_float('simulationTimeStep', 0.001)
 
+        self.velocity_command = None
         self.pose = None
         self.velocity = None
         self.angular_velocity = None
         self.acceleration = None
         self.state_stamp = None
         self.link = self.robot.GetLink('base_link')
-
         self.inertia = self.link.GetLocalInertia().diagonal()
         self.mass = self.get_mass()
-
         self.verbose = verbose
 
         self.reset()
@@ -184,13 +181,12 @@ class Controller(object):
         vel.yaw = yaw
 
         self.switch_physics_engine(True)
-
         for s in range(steps):
-            print '\nstep: {}, time: {}'.format(s, self.get_sim_time())
+            if self.verbose:
+                print '\nstep: {}, time: {}'.format(s, self.get_sim_time())
             self.cmd_vel(vel, self.dt, add_noise=False)
             self.update(self.dt)
             self.env.StepSimulation(self.dt)
-
         self.switch_physics_engine(False)
 
     def reset(self):

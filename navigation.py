@@ -7,6 +7,7 @@ import json
 import utils
 import trajoptpy
 import controller
+import printable
 import addict
 import openravepy as rave
 import numpy as np
@@ -14,13 +15,15 @@ import numpy as np
 from trajoptpy import check_traj
 
 
-class NavigationPlanning(object):
-    def __init__(self, robot):
+class Navigation(printable.Printable):
+    def __init__(self, robot, verbose=False):
+        super(Navigation, self).__init__()
+
+        self.verbose = verbose
         self.env = robot.GetEnv()
         self.robot = robot
         self.controller = controller.Controller(
-            self.env, controller_conf='conf/controller.xml', verbose=True)
-
+            self.env, controller_conf='conf/controller.xml', verbose=self.verbose)
         with self.env:
             envmin = []
             envmax = []
@@ -96,7 +99,8 @@ class NavigationPlanning(object):
             self.controller.follow(traj)
         else:
             for (i, row) in enumerate(traj):
-                print 'step: {}, dofs: {}'.format(i, row)
+                if self.verbose:
+                    print 'step: {}, dofs: {}'.format(i, row)
                 self.robot.SetActiveDOFValues(row)
                 time.sleep(0.1)
 
@@ -122,12 +126,13 @@ class NavigationPlanning(object):
         return goal
 
     def run(self):
-        self.controller.maneuver(100000)
+        self.controller.maneuver(1000000)
 
         while True:
             goal = self.collision_free(self.random_goal)
 
-            print 'planning to: {}'.format(goal)
+            if self.verbose:
+                print 'planning to: {}'.format(goal)
             h = self.draw_goal(goal)
 
             request = self.make_fullbody_request(goal)
@@ -137,9 +142,11 @@ class NavigationPlanning(object):
 
             if traj is not None and len(traj):
                 if check_traj.traj_is_safe(traj, self.robot):
-                    print "trajectory is safe! :)"
+                    if self.verbose:
+                        print "trajectory is safe! :)"
                     self.execute_trajectory(traj, True)
                 else:
-                    print "trajectory contains a collision :("
+                    if self.verbose:
+                        print "trajectory contains a collision :("
 
             time.sleep(1)
