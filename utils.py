@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import division
+from __future__ import with_statement  # for python 2.5
 
-from collections import defaultdict
 import inspect
 import pprint
 import sys
 import numpy as np
+import xml.etree.ElementTree as Et
+from collections import defaultdict
+from tf import transformations
 
 
 __author__ = "Aijun Bai"
@@ -33,6 +36,10 @@ def drange(start=0.0, stop=1.0, step=0.1):
         r += step
 
 
+def pause():
+    raw_input('Enter to continue!')
+
+
 def pv(*args, **kwargs):
     for name in args:
         record = inspect.getouterframes(inspect.currentframe())[1]
@@ -44,8 +51,9 @@ def pv(*args, **kwargs):
             else sys.stderr
 
         print >> iostream, '%s%s: %s' % (prefix, name, pprint.pformat(val))
-        if 'pause' in kwargs:
-            raw_input('Enter to continue!')
+
+    if 'pause' in kwargs:
+        pause()
 
 
 def mean(samples):
@@ -65,3 +73,32 @@ def flatten(x):
 
 def forward(*args):
     print '\t'.join(str(i) for i in args)
+
+
+class Xml(object):
+    def __init__(self, file_name):
+        self.tree = Et.parse(file_name)
+        self.root = self.tree.getroot()
+
+    def parse_float(self, key, default):
+        try:
+            return float(self.root.find(key).text)
+        except (TypeError, AttributeError) as e:
+            return default
+
+def rotate(v, q):
+    """
+    Rotate vector v according to quaternion q
+    """
+    q2 = np.append(v, [0.0])
+    return transformations.quaternion_multiply(
+        transformations.quaternion_multiply(q, q2),
+        transformations.quaternion_conjugate(q))[:3]
+
+def warning(*args):
+    print >> sys.stderr, "WARNING: ", args
+
+def bound(value, limit):
+    if 0.0 < limit < abs(value):
+        return np.sign(value) * limit
+    return value

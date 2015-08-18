@@ -1,0 +1,20 @@
+<controller>
+    <rollpitchProportionalGain>10.0</rollpitchProportionalGain>
+    <rollpitchDifferentialGain>5.0</rollpitchDifferentialGain>
+    <rollpitchLimit>0.5</rollpitchLimit>
+    <yawProportionalGain>2.0</yawProportionalGain>
+    <yawDifferentialGain>1.0</yawDifferentialGain>
+    <yawLimit>1.5</yawLimit>
+    <velocityXYProportionalGain>5.0</velocityXYProportionalGain>
+    <velocityXYDifferentialGain>1.0</velocityXYDifferentialGain>
+    <velocityXYLimit>2</velocityXYLimit>
+    <velocityZProportionalGain>5.0</velocityZProportionalGain>
+    <velocityZDifferentialGain>1.0</velocityZDifferentialGain>
+    <velocityZLimit>0.5</velocityZLimit>
+    <maxForce>30</maxForce>
+    <motionSmallNoise>0.05</motionSmallNoise>
+    <motionDriftNoise>0.03</motionDriftNoise>
+    <motionDriftNoiseTime>5.0</motionDriftNoiseTime>
+    <simulationTimeStep>0.001</simulationTimeStep>
+</controller>
+

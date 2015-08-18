@@ -1,9 +1,13 @@
+# coding=utf-8
+
 __author__ = 'Aijun Bai'
 
 import time
 import json
 import utils
 import trajoptpy
+import controller
+import addict
 import openravepy as rave
 import numpy as np
 
@@ -14,8 +18,8 @@ class NavigationPlanning(object):
     def __init__(self, robot):
         self.env = robot.GetEnv()
         self.robot = robot
-
-        self.switch_physics_engine(False)
+        self.controller = controller.Controller(
+            self.env, controller_conf='conf/controller.xml', verbose=True)
 
         with self.env:
             envmin = []
@@ -32,19 +36,18 @@ class NavigationPlanning(object):
             envmin[2] += 0.1
             envmax[2] += 1.0
 
-            self.bounds = np.array(((envmin[0], envmin[1], envmin[2], -np.pi),
-                                    (envmax[0], envmax[1], envmax[2], np.pi)))
+            self.bounds = np.array(((envmin[0], envmin[1], envmin[2], 0, 0, -np.pi),
+                                    (envmax[0], envmax[1], envmax[2], 0, 0, np.pi)))
 
             self.robot.SetAffineTranslationLimits(envmin, envmax)
             self.robot.SetAffineTranslationMaxVels([0.5, 0.5, 0.5, 0.5])
             self.robot.SetAffineRotationAxisMaxVels(np.ones(4))
 
             self.robot.SetActiveDOFs(
-                [], rave.DOFAffine.X | rave.DOFAffine.Y | rave.DOFAffine.Z | rave.DOFAffine.RotationAxis,
-                [0, 0, 1])
+                [], rave.DOFAffine.X | rave.DOFAffine.Y | rave.DOFAffine.Z | rave.DOFAffine.Rotation3D)
 
     def random_goal(self):
-        return self.bounds[0,:] + np.random.rand(4) * (self.bounds[1,:] - self.bounds[0,:])
+        return self.bounds[0,:] + np.random.rand(6) * (self.bounds[1,:] - self.bounds[0,:])
 
     @staticmethod
     def make_fullbody_request(end_joints):
@@ -88,24 +91,14 @@ class NavigationPlanning(object):
 
         return d
 
-    def switch_physics_engine(self, on):
-        with self.env:
-            self.env.SetPhysicsEngine(None)
-
-            if on:
-                physics = rave.RaveCreatePhysicsEngine(self.env, 'ode')
-                physics.SetGravity(np.array((0, 0, -9.8)))
-
-                self.env.SetPhysicsEngine(physics)
-                self.env.StopSimulation()
-                self.env.StartSimulation(timestep=0.001)
-
-
-    def animate_traj(self, traj):
-        for (i, row) in enumerate(traj):
-            print 'step: {}, dofs: {}'.format(i, row)
-            self.robot.SetActiveDOFValues(row)
-            time.sleep(0.1)
+    def execute_trajectory(self, traj, physics=False):
+        if physics:
+            self.controller.follow(traj)
+        else:
+            for (i, row) in enumerate(traj):
+                print 'step: {}, dofs: {}'.format(i, row)
+                self.robot.SetActiveDOFValues(row)
+                time.sleep(0.1)
 
     def draw_goal(self, goal):
         center = goal[0:3]
@@ -116,22 +109,27 @@ class NavigationPlanning(object):
                        center + 0.5 * xaxis + 0.5 * yaxis, center + xaxis, center + 0.5 * xaxis - 0.5 * yaxis]
         return self.env.drawlinelist(np.transpose(points), linewidth=2.0, colors=np.array((0, 1, 0)))
 
-    def run(self):
-        while True:
-            state = self.robot.GetActiveDOFValues()
-            with self.robot:
-                while True:
-                    goal = self.random_goal()
-                    self.robot.SetActiveDOFValues(goal)
+    def collision_free(self, method):
+        state = self.robot.GetActiveDOFValues()
+        goal = None
+        with self.robot:
+            while True:
+                goal = method()
+                self.robot.SetActiveDOFValues(goal)
+                if not self.env.CheckCollision(self.robot):
+                    break
+        self.robot.SetActiveDOFValues(state)
+        return goal
 
-                    if not self.env.CheckCollision(self.robot):
-                        print 'retargting...'
-                        break
+    def run(self):
+        self.controller.maneuver(100000)
+
+        while True:
+            goal = self.collision_free(self.random_goal)
 
             print 'planning to: {}'.format(goal)
             h = self.draw_goal(goal)
 
-            self.robot.SetActiveDOFValues(state)
             request = self.make_fullbody_request(goal)
             prob = trajoptpy.ConstructProblem(json.dumps(request), self.env)
             result = trajoptpy.OptimizeProblem(prob)
@@ -140,7 +138,7 @@ class NavigationPlanning(object):
             if traj is not None and len(traj):
                 if check_traj.traj_is_safe(traj, self.robot):
                     print "trajectory is safe! :)"
-                    self.animate_traj(traj)
+                    self.execute_trajectory(traj, True)
                 else:
                     print "trajectory contains a collision :("
 

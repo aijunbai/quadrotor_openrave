@@ -1,0 +1,36 @@
+<controller>
+    <velocityXYProportionalGain>5.0</velocityXYProportionalGain>
+    <velocityXYIntegralGain>1.0</velocityXYIntegralGain>
+    <velocityXYDifferentialGain>0.0</velocityXYDifferentialGain>
+    <velocityXYOutputLimit>10.0</velocityXYOutputLimit>
+    <velocityXYTimeConstant>0.05</velocityXYTimeConstant>
+
+    <velocityZProportionalGain>5.0</velocityZProportionalGain>
+    <velocityZIntegralGain>1.0</velocityZIntegralGain>
+    <velocityZDifferentialGain>0.0</velocityZDifferentialGain>
+    <velocityZOutputLimit>10.0</velocityZOutputLimit>
+    <velocityZTimeConstant>0.05</velocityZTimeConstant>
+
+    <rollpitchProportionalGain>10.0</rollpitchProportionalGain>
+    <rollpitchIntegralGain>5.0</rollpitchIntegralGain>
+    <rollpitchDifferentialGain>5.0</rollpitchDifferentialGain>
+    <rollpitchTimeConstant>0.05</rollpitchTimeConstant>
+
+    <yawProportionalGain>5.0</yawProportionalGain>
+    <yawIntegralGain>2.5</yawIntegralGain>
+    <yawDifferentialGain>0.0</yawDifferentialGain>
+    <yawOutputLimit>3.0</yawOutputLimit>
+    <yawTimeConstant>0.05</yawTimeConstant>
+    
+    <loadFactorLimit>1.5</loadFactorLimit>
+    <forceZLimit>30</forceZLimit>
+    <torqueXYLimit>10.0</torqueXYLimit>
+    <torqueZLimit>1.0</torqueZLimit>
+
+    <motionSmallNoise>0.05</motionSmallNoise>
+    <motionDriftNoise>0.03</motionDriftNoise>
+    <motionDriftNoiseTime>5.0</motionDriftNoiseTime>
+
+    <simulationTimeStep>0.001</simulationTimeStep>
+</controller>
+

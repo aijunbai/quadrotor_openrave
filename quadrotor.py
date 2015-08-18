@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from __future__ import division
 from __future__ import with_statement  # for python 2.5
-
-__author__ = 'Aijun Bai'
 
 import os
 import time
 import navigation
 import openravepy as rave
 import numpy as np
+
+__author__ = 'Aijun Bai'
 
 
 def main(env, options):
@@ -24,7 +25,6 @@ def main(env, options):
 
 from optparse import OptionParser
 from openravepy.misc import OpenRAVEGlobalArguments
-
 
 @rave.with_destroy
 def run(args=None):
