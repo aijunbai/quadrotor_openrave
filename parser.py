@@ -24,6 +24,6 @@ class Yaml(addict.Dict):
         super(Yaml, self).__init__(param_list[0][0])
 
     def __call__(self, key, default):
-        if not key in self:
+        if key not in self:
             self[key] = default
         return self[key]

@@ -74,6 +74,7 @@ def flatten(x):
 def forward(*args):
     print '\t'.join(str(i) for i in args)
 
+
 def rotate(v, q):
     """
     Rotate vector v according to quaternion q

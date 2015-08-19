@@ -52,7 +52,7 @@ class Navigation(printable.Printable):
                 [], rave.DOFAffine.X | rave.DOFAffine.Y | rave.DOFAffine.Z | rave.DOFAffine.Rotation3D)
 
     def random_goal(self):
-        return self.bounds[0,:] + np.random.rand(6) * (self.bounds[1,:] - self.bounds[0,:])
+        return self.bounds[0, :] + np.random.rand(6) * (self.bounds[1, :] - self.bounds[0, :])
 
     @staticmethod
     def make_fullbody_request(end_joints):

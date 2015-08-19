@@ -27,6 +27,7 @@ def main(env, options):
 from optparse import OptionParser
 from openravepy.misc import OpenRAVEGlobalArguments
 
+
 @rave.with_destroy
 def run(args=None):
     parser = OptionParser(description='Navigation planning using trajopt.')

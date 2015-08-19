@@ -5,7 +5,9 @@ from __future__ import with_statement  # for python 2.5
 
 import pprint
 
+
 __author__ = 'Aijun Bai'
+
 
 class Printable(object):
     def __init__(self):

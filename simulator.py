@@ -12,15 +12,16 @@ import numpy as np
 
 __author__ = 'Aijun Bai'
 
+
 class Simulator(printable.Printable):
     def __init__(self, env, params, verbose=False):
+        super(Simulator, self).__init__()
+
         self.env = env
         self.verbose = verbose
-
         self.dt = params('timestep', 0.001)
         self.command = addict.Dict()
         self.set_physics_engine(on=False)
-
         self.controllers = []
         self.controllers.append(controller.TwistController(self.env, params.controller.twist, verbose=self.verbose))
 

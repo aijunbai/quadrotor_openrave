@@ -13,14 +13,14 @@ import numpy as np
 import openravepy as rave
 from tf import transformations
 
-
 __author__ = 'Aijun Bai'
 
 
 class Controller(printable.Printable):
     def __init__(self, env, verbose=False):
-        self.verbose = verbose
+        super(Controller, self).__init__()
 
+        self.verbose = verbose
         self.env = env
         self.robot = env.GetRobots()[0]
         self.kinbody = self.env.GetKinBody(self.robot.GetName())
@@ -30,22 +30,24 @@ class Controller(printable.Printable):
         self.velocity = None
         self.angular_velocity = None
         self.acceleration = None
+        self.command = None
 
         self.link = self.robot.GetLink('base_link')
         self.inertia = self.link.GetLocalInertia().diagonal()
         self.mass = self.get_mass()
-
         self.pids = addict.Dict()
 
-    def update(self):
+    def update(self, command, dt):
         self.pose = self.robot.GetActiveDOFValues()
         self.velocity = self.link.GetVelocity()[:3]
         self.angular_velocity = self.link.GetVelocity()[3:]
         self.acceleration = self.robot.GetLinkAccelerations([])[0][:3]
+        self.command = command
 
         if self.verbose:
             utils.pv('self.position', 'self.euler', 'self.velocity', 'self.acceleration')
             utils.pv('self.mass', 'self.inertia')
+            utils.pv('self.command')
 
     def get_mass(self):
         return sum(l.GetMass() for l in self.robot.GetLinks())
@@ -84,14 +86,11 @@ class TwistController(Controller):
         self.force_z_limit = params.limits('force_z', -1.0)
         self.torque_xy_limit = params.limits('torque_xy', -1.0)
         self.torque_z_limit = params.limits('torque_z', -1.0)
-        self.twist = None
 
         self.reset()
 
     def update(self, command, dt):
-        super(TwistController, self).update()
-
-        self.twist = command.twist
+        super(TwistController, self).update(command, dt)
 
         gravity_body = utils.rotate(self.physics_engine.GetGravity(), self.quaternion)
         gravity = np.linalg.norm(gravity_body)
@@ -106,13 +105,15 @@ class TwistController(Controller):
         acceleration_xy = utils.rotate(self.acceleration, inverse_quaternion)
         angular_velocity_body = utils.rotate(self.angular_velocity, inverse_quaternion)
 
-        pitch_command = self.pids.x.update(self.twist.x, velocity_xy[0], acceleration_xy[0], dt) / gravity
-        roll_command = self.pids.y.update(self.twist.y, velocity_xy[1], acceleration_xy[1], dt) / gravity
+        pitch_command = self.pids.x.update(self.command.twist.x, velocity_xy[0], acceleration_xy[0], dt) / gravity
+        roll_command = self.pids.y.update(self.command.twist.y, velocity_xy[1], acceleration_xy[1], dt) / gravity
 
         torque[0] = self.inertia[0] * self.pids.roll.update(roll_command, self.euler[0], angular_velocity_body[0], dt)
         torque[1] = self.inertia[1] * self.pids.pitch.update(pitch_command, self.euler[1], angular_velocity_body[1], dt)
-        torque[2] = self.inertia[2] * self.pids.yaw.update(self.twist.yaw, self.angular_velocity[2], 0, dt)
-        force[2] = self.mass * (self.pids.z.update(self.twist.z, self.velocity[2], self.acceleration[2], dt) + load_factor * gravity)
+        torque[2] = self.inertia[2] * self.pids.yaw.update(self.command.twist.yaw, self.angular_velocity[2], 0, dt)
+        force[2] = self.mass * (
+            self.pids.z.update(
+                self.command.twist.z, self.velocity[2], self.acceleration[2], dt) + load_factor * gravity)
 
         torque[0] = utils.bound(torque[0], self.torque_xy_limit)
         torque[1] = utils.bound(torque[1], self.torque_xy_limit)
@@ -120,7 +121,7 @@ class TwistController(Controller):
         force[2] = utils.bound(force[2], self.force_z_limit)
 
         if self.verbose:
-            utils.pv('self.twist', 'pitch_command', 'roll_command')
+            utils.pv('pitch_command', 'roll_command')
             utils.pv('load_factor', 'force', 'torque')
 
         with self.env:
