@@ -7,7 +7,7 @@ import inspect
 import pprint
 import sys
 import numpy as np
-import xml.etree.ElementTree as Et
+
 from collections import defaultdict
 from tf import transformations
 
@@ -74,18 +74,6 @@ def flatten(x):
 def forward(*args):
     print '\t'.join(str(i) for i in args)
 
-
-class Xml(object):
-    def __init__(self, file_name):
-        self.tree = Et.parse(file_name)
-        self.root = self.tree.getroot()
-
-    def parse_float(self, key, default):
-        try:
-            return float(self.root.find(key).text)
-        except (TypeError, AttributeError) as e:
-            return default
-
 def rotate(v, q):
     """
     Rotate vector v according to quaternion q
@@ -95,10 +83,13 @@ def rotate(v, q):
         transformations.quaternion_multiply(q, q2),
         transformations.quaternion_conjugate(q))[:3]
 
+
 def warning(*args):
     print >> sys.stderr, "WARNING: ", args
 
+
 def bound(value, limit):
     if 0.0 < limit < abs(value):
+        pause()
         return np.sign(value) * limit
     return value

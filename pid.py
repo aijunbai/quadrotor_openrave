@@ -14,15 +14,15 @@ __author__ = 'Aijun Bai'
 
 
 class PIDController(printable.Printable):
-    def __init__(self, conf, prefix):
+    def __init__(self, params):
         super(PIDController, self).__init__()
 
-        self.k_p = conf.parse_float(prefix + 'ProportionalGain', 0.0)
-        self.k_d = conf.parse_float(prefix + 'DifferentialGain', 0.0)
-        self.k_i = conf.parse_float(prefix + 'IntegralGain', 0.0)
-        self.time_constant = conf.parse_float(prefix + 'TimeConstant', 0.0)
-        self.limit_i = conf.parse_float(prefix + 'LimitI', -1.0)
-        self.limit_output = conf.parse_float(prefix + 'LimitOutput', -1.0)
+        self.k_p = params('k_p', 0.0)
+        self.k_d = params('k_d', 0.0)
+        self.k_i = params('k_i', 0.0)
+        self.time_constant = params('time_constant', 0.0)
+        self.limit_i = params('limit_i', -1.0)
+        self.limit_output = params('limit_output', -1.0)
 
         self.p = 0.0
         self.i = 0.0

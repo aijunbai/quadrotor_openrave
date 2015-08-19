@@ -6,9 +6,10 @@ import time
 import json
 import utils
 import trajoptpy
-import controller
+import simulator
 import printable
 import addict
+import parser
 import openravepy as rave
 import numpy as np
 
@@ -22,8 +23,9 @@ class Navigation(printable.Printable):
         self.verbose = verbose
         self.env = robot.GetEnv()
         self.robot = robot
-        self.controller = controller.Controller(
-            self.env, controller_conf='conf/controller.xml', verbose=self.verbose)
+        self.params = parser.Yaml(file_name='params/simulator.yaml')
+        self.simulator = simulator.Simulator(self.env, self.params, self.verbose)
+
         with self.env:
             envmin = []
             envmax = []
@@ -126,7 +128,7 @@ class Navigation(printable.Printable):
         return goal
 
     def run(self):
-        self.controller.maneuver(1000000)
+        self.simulator.run(1000000)
 
         while True:
             goal = self.collision_free(self.random_goal)
