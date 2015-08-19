@@ -128,27 +128,27 @@ class Navigation(printable.Printable):
         return goal
 
     def run(self):
-        self.simulator.run(1000000)
+        self.simulator.run(100000)
 
-        while True:
-            goal = self.collision_free(self.random_goal)
-
-            if self.verbose:
-                print 'planning to: {}'.format(goal)
-            h = self.draw_goal(goal)
-
-            request = self.make_fullbody_request(goal)
-            prob = trajoptpy.ConstructProblem(json.dumps(request), self.env)
-            result = trajoptpy.OptimizeProblem(prob)
-            traj = result.GetTraj()
-
-            if traj is not None and len(traj):
-                if check_traj.traj_is_safe(traj, self.robot):
-                    if self.verbose:
-                        print "trajectory is safe! :)"
-                    self.execute_trajectory(traj, True)
-                else:
-                    if self.verbose:
-                        print "trajectory contains a collision :("
-
-            time.sleep(1)
+        # while True:
+        #     goal = self.collision_free(self.random_goal)
+        #
+        #     if self.verbose:
+        #         print 'planning to: {}'.format(goal)
+        #     h = self.draw_goal(goal)
+        #
+        #     request = self.make_fullbody_request(goal)
+        #     prob = trajoptpy.ConstructProblem(json.dumps(request), self.env)
+        #     result = trajoptpy.OptimizeProblem(prob)
+        #     traj = result.GetTraj()
+        #
+        #     if traj is not None and len(traj):
+        #         if check_traj.traj_is_safe(traj, self.robot):
+        #             if self.verbose:
+        #                 print "trajectory is safe! :)"
+        #             self.execute_trajectory(traj, True)
+        #         else:
+        #             if self.verbose:
+        #                 print "trajectory contains a collision :("
+        #
+        #     time.sleep(1)

@@ -33,10 +33,12 @@ def run(args=None):
     parser = OptionParser(description='Navigation planning using trajopt.')
     OpenRAVEGlobalArguments.addOptions(parser)
 
-    parser.add_option('--scene',
-                      action='store', type='string', dest='scene', default='quadrotor.env.xml',
+    parser.add_option('-s', '--scene',
+                      action='store', type='string', dest='scene', default='data/quadrotor.env.xml',
                       help='Scene file to load (default=%default)')
-    parser.add_option('--verbose', action='store_true', dest='verbose', help='Set verbose output')
+    parser.add_option('-v', '--verbose',
+                      action='store_true', dest='verbose', default=False,
+                      help='Set verbose output')
 
     (options, leftargs) = parser.parse_args(args=args)
     OpenRAVEGlobalArguments.parseAndCreateThreadedUser(options, main, defaultviewer=True)

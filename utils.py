@@ -91,6 +91,5 @@ def warning(*args):
 
 def bound(value, limit):
     if 0.0 < limit < abs(value):
-        pause()
         return np.sign(value) * limit
     return value
