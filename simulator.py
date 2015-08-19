@@ -22,11 +22,19 @@ class Simulator(printable.Printable):
         self.dt = params('timestep', 0.001)
         self.command = addict.Dict()
         self.set_physics_engine(on=False)
+
         self.controllers = []
-        self.controllers.append(controller.TwistController(self.env, params.controller.twist, verbose=self.verbose))
+        self.controllers.append(
+            controller.TrajectoryController(self.env, params=params.controller.trajectory, verbose=self.verbose))
+        self.controllers.append(
+            controller.PoseController(self.env, params=params.controller.pose, verbose=self.verbose))
+        self.controllers.append(
+            controller.TwistController(self.env, params=params.controller.twist, verbose=self.verbose))
+        self.controllers.append(controller.WrenchController(self.env, params=None, verbose=self.verbose))
 
     def run(self, steps):
         self.set_physics_engine(on=True)
+
         for s in range(steps):
             if self.verbose:
                 print '\nstep: {}, time: {}'.format(s, self.get_sim_time())
@@ -41,7 +49,9 @@ class Simulator(printable.Printable):
             for c in self.controllers:
                 c.update(self.command, self.dt)
 
-            self.env.StepSimulation(self.dt)
+            with self.env:
+                self.env.StepSimulation(self.dt)
+
         self.set_physics_engine(on=False)
 
     def set_physics_engine(self, on=False):
