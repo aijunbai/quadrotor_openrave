@@ -45,5 +45,5 @@ controller:
             force_z: 30.0
             torque_xy: 10.0
             torque_z: 1.0
-timestep: 0.001
+timestep: 0.01
 

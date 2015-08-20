@@ -27,7 +27,7 @@ if [ $VERBOSE = "True" ]; then
 fi
 
 if [ $PROFILE = "True" ]; then
-    time $PYTHON -m cProfile -o $QUADROTOR_PROF $QUADROTOR $VERBOSE
+    time $PYTHON -m cProfile -o $QUADROTOR_PROF $QUADROTOR
     profile $QUADROTOR_PROF
 else
     time $PYTHON $QUADROTOR

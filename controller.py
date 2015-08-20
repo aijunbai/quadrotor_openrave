@@ -110,11 +110,6 @@ class Controller(printable.Printable):
     def gravity(self):
         return np.linalg.norm(self.physics_engine.GetGravity())
 
-    @property
-    @memoized
-    def center_of_mass(self):
-        pass
-
     @memoized.reset()
     def reset(self):
         for k, v in self.pid.items():
@@ -205,8 +200,8 @@ class WrenchController(Controller):
         torque = torque - np.cross(l_com, force)
 
         if self.verbose:
-            utils.pv('self.position', 'self.euler')
             utils.pv('g_com', 'l_com', 'force', 'torque')
+            utils.pv('self.from_body(force)', 'self.from_body(torque)')
 
         with self.env:
             self.link.SetForce(self.from_body(force), g_com, True)

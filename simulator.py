@@ -7,6 +7,8 @@ import parser
 import printable
 import controller
 import addict
+import time
+
 import openravepy as rave
 import numpy as np
 
@@ -36,6 +38,7 @@ class Simulator(printable.Printable):
         self.set_physics_engine(on=True)
 
         for s in range(steps):
+            start = time.time()
             if self.verbose:
                 print '\nstep: {}, time: {}'.format(s, self.get_sim_time())
 
@@ -51,6 +54,8 @@ class Simulator(printable.Printable):
 
             with self.env:
                 self.env.StepSimulation(self.dt)
+            end = time.time()
+            time.sleep(max(self.dt - end + start, 0.0))
 
         self.set_physics_engine(on=False)
 
