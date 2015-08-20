@@ -41,10 +41,10 @@ class Simulator(printable.Printable):
 
             self.command.clear()
 
-            self.command.twist.x = 0
-            self.command.twist.y = 0
-            self.command.twist.z = 0
-            self.command.twist.yaw = 0
+            self.command.twist.linear.x = 0.0
+            self.command.twist.linear.y = 0.0
+            self.command.twist.linear.z = 0.0
+            self.command.twist.angular.z = 0.0
 
             for c in self.controllers:
                 c.update(self.command, self.dt)
@@ -61,7 +61,7 @@ class Simulator(printable.Printable):
 
             if on:
                 physics = rave.RaveCreatePhysicsEngine(self.env, 'ode')
-                physics.SetGravity(np.array((0, 0, -9.8)))
+                physics.SetGravity(np.array([0, 0, -9.8], dtype=np.float))
                 self.env.SetPhysicsEngine(physics)
 
     def get_sim_time(self):

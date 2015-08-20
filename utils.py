@@ -61,8 +61,8 @@ def mean(samples):
 
 
 def norm(a, b):
-    a_ = np.array(a)
-    b_ = np.array(b)
+    a_ = np.array(a, dtype=np.float)
+    b_ = np.array(b, dtype=np.float)
 
     return np.linalg.norm(a_ - b_)
 
@@ -79,7 +79,7 @@ def rotate(v, q):
     """
     Rotate vector v according to quaternion q
     """
-    q2 = np.append(v, [0.0])
+    q2 = np.array([v[0], v[1], v[2], 0.0], dtype=np.float)
     return transformations.quaternion_multiply(
         transformations.quaternion_multiply(q, q2),
         transformations.quaternion_conjugate(q))[:3]

@@ -22,8 +22,12 @@ profile() {
     rm -f $PNG
 }
 
+if [ $VERBOSE = "True" ]; then
+    QUADROTOR="$QUADROTOR --verbose"
+fi
+
 if [ $PROFILE = "True" ]; then
-    time $PYTHON -m cProfile -o $QUADROTOR_PROF $QUADROTOR 
+    time $PYTHON -m cProfile -o $QUADROTOR_PROF $QUADROTOR $VERBOSE
     profile $QUADROTOR_PROF
 else
     time $PYTHON $QUADROTOR

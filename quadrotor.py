@@ -13,17 +13,6 @@ import numpy as np
 __author__ = 'Aijun Bai'
 
 
-def main(env, options):
-    env.Load(options.scene)
-    robot = env.GetRobots()[0]
-    env.UpdatePublishedBodies()
-
-    time.sleep(0.1)  # give time for environment to update
-    navi = navigation.Navigation(robot, verbose=options.verbose)
-    print navi
-    navi.run()
-
-
 from optparse import OptionParser
 from openravepy.misc import OpenRAVEGlobalArguments
 
@@ -41,7 +30,17 @@ def run(args=None):
                       help='Set verbose output')
 
     (options, leftargs) = parser.parse_args(args=args)
-    OpenRAVEGlobalArguments.parseAndCreateThreadedUser(options, main, defaultviewer=True)
+
+    env = rave.Environment()
+    env.SetViewer('qtcoin')
+    env.Load(options.scene)
+    robot = env.GetRobots()[0]
+    env.UpdatePublishedBodies()
+
+    time.sleep(0.1)  # give time for environment to update
+    navi = navigation.Navigation(robot, verbose=options.verbose)
+    print navi
+    navi.run()
 
 
 if __name__ == "__main__":
