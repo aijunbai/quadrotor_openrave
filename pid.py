@@ -9,68 +9,89 @@ import math
 import addict
 import numpy as np
 
-
 __author__ = 'Aijun Bai'
 
 
 class PIDController(printable.Printable):
-    def __init__(self, params):
+    nan = float('nan')
+
+    def __init__(self, params, verbose=False):
         super(PIDController, self).__init__()
 
-        self.k_p = params('k_p', 0.0)
-        self.k_d = params('k_d', 0.0)
-        self.k_i = params('k_i', 0.0)
-        self.time_constant = params('time_constant', 0.0)
-        self.limit_i = params('limit_i', -1.0)
-        self.limit_output = params('limit_output', -1.0)
+        self.verbose = verbose
+        self.params, self.state = addict.Dict(), addict.Dict()
 
-        self.p = 0.0
-        self.i = 0.0
-        self.d = 0.0
-        self.input = 0.0
-        self.dx = 0.0
+        self.params.k_p = params('k_p', 0.0)
+        self.params.k_d = params('k_d', 0.0)
+        self.params.k_i = params('k_i', 0.0)
+        self.params.time_constant = params('time_constant', 0.0)
+        self.params.limit_i = params('limit_i', -1.0)
+        self.params.limit_output = params('limit_output', -1.0)
 
         self.reset()
 
     def reset(self):
-        self.input = self.dx = 0.0
-        self.p = self.i = self.d = 0.0
+        self.state.p = PIDController.nan
+        self.state.i = 0.0
+        self.state.d = PIDController.nan
+        self.state.input = PIDController.nan
+        self.state.dx = PIDController.nan
 
     def update(self, input_, x, dx, dt):
-        if math.isnan(self.input):
-            self.input = input_
+        if self.verbose:
+            print "input: {}, x: {}, dx: {}, dt: {}".format(input_, x, dx, dt)
 
-        if dt + self.time_constant > 0.0:
-            self.input = (dt * input_ + self.time_constant * self.input) / (dt + self.time_constant)
+        if math.isnan(self.state.input):
+            self.state.input = input_
 
-        return self._update(self.input - x, dx, dt)
+        if dt + self.params.time_constant > 0.0:
+            self.state.input = (dt * input_ + self.params.time_constant * self.state.input) / \
+                               (dt + self.params.time_constant)
+
+        return self._update(self.state.input - x, dx, dt)
 
     def _update(self, error, dx, dt):
+        if self.verbose:
+            print "error: {}, dx: {}, dt: {}".format(error, dx, dt)
+
         if math.isnan(error):
             return 0.0
 
-        self.i += error * dt
-        self.i = utils.bound(self.i, self.limit_i)
+        # integral error
+        self.state.i += error * dt
+        self.state.i = utils.bound(self.state.i, self.params.limit_i)
 
-        if dt > 0.0 and not math.isnan(self.p) and not math.isnan(self.dx):
-            self.d = (error - self.p) / dt + self.dx - dx
+        # differential error
+        if dt > 0.0 and not math.isnan(self.state.p) and not math.isnan(self.state.dx):
+            self.state.d = (error - self.state.p) / dt + self.state.dx - dx
         else:
-            self.d = -dx
-        self.dx = dx
+            self.state.d = -dx
+        self.state.dx = dx
 
-        output = self.k_p * self.p + self.k_i * self.i + self.k_d * self.d
+        # proportional error
+        self.state.p = error
+
+        # calculate output...
+        output = self.params.k_p * self.state.p +\
+            self.params.k_i * self.state.i + \
+            self.params.k_d * self.state.d
+
+        if self.verbose:
+            print "output: {}, k_p: {}, p: {}, k_i: {}, i: {}, k_d: {}, d: {}".format(
+                output, self.params.k_p, self.state.p, self.params.k_i,
+                self.state.i, self.params.k_d, self.state.d)
+
         antiwindup = 0
-
-        if self.limit_output > 0.0:
-            if output > self.limit_output:
+        if self.params.limit_output > 0.0:
+            if output > self.params.limit_output:
                 antiwindup = 1
-            elif output < -self.limit_output:
+            elif output < -self.params.limit_output:
                 antiwindup = -1
 
-        output = utils.bound(output, self.limit_output)
+        output = utils.bound(output, self.params.limit_output)
 
         if antiwindup != 0 and error * dt * antiwindup > 0.0:
-            self.i -= error * dt
+            self.state.i -= error * dt
 
         if math.isnan(output):
             output = 0.0

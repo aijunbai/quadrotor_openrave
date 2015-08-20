@@ -577,8 +577,7 @@
 			<rigid_body sid="rigid1" name="front_cam_link">
 				<technique_common>
 					<dynamic>true</dynamic>
-					<!-- mass>0.001</mass -->
-					<mass>0.0</mass>
+					<mass>0.001</mass>
 					<mass_frame>
 						<translate>0.05 0 -0.06</translate>
 						<rotate>1 0 0 0</rotate>
@@ -592,8 +591,7 @@
 			<rigid_body sid="rigid3" name="laser0_frame">
 				<technique_common>
 					<dynamic>true</dynamic>
-					<!-- mass>0.27</mass -->
-					<mass>0.0</mass>
+					<mass>0.27</mass>
 					<mass_frame>
 						<translate>0 0 -0.097</translate>
 						<rotate>-1 -0 -0 179.9999999999882</rotate>
@@ -604,8 +602,7 @@
 			<rigid_body sid="rigid4" name="sonar_link">
 				<technique_common>
 					<dynamic>true</dynamic>
-					<!-- mass>0.001</mass -->
-					<mass>0.0</mass>
+					<mass>0.001</mass>
 					<mass_frame>
 						<translate>-0.16 0 -0.012</translate>
 						<rotate>0 1 0 89.99999999971946</rotate>

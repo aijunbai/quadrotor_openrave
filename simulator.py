@@ -34,8 +34,12 @@ class Simulator(printable.Printable):
             controller.TwistController(self.env, params=params.controller.twist, verbose=self.verbose))
         self.controllers.append(controller.WrenchController(self.env, params=None, verbose=self.verbose))
 
-    def run(self, steps):
+    def run(self, total_time):
+        """
+        Run the simulation for total_time in seconds
+        """
         self.set_physics_engine(on=True)
+        steps = int(total_time / self.dt)
 
         for s in range(steps):
             start = time.time()
@@ -54,8 +58,7 @@ class Simulator(printable.Printable):
 
             with self.env:
                 self.env.StepSimulation(self.dt)
-            end = time.time()
-            time.sleep(max(self.dt - end + start, 0.0))
+            time.sleep(max(self.dt - time.time() + start, 0.0))
 
         self.set_physics_engine(on=False)
 
@@ -66,7 +69,7 @@ class Simulator(printable.Printable):
 
             if on:
                 physics = rave.RaveCreatePhysicsEngine(self.env, 'ode')
-                physics.SetGravity(np.array([0, 0, -9.8], dtype=np.float))
+                physics.SetGravity(np.array([0, 0, -9.797930195020351]))
                 self.env.SetPhysicsEngine(physics)
 
     def get_sim_time(self):

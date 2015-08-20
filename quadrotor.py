@@ -39,7 +39,6 @@ def run(args=None):
 
     time.sleep(0.1)  # give time for environment to update
     navi = navigation.Navigation(robot, verbose=options.verbose)
-    print navi
     navi.run()
 
 

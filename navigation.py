@@ -35,14 +35,14 @@ class Navigation(printable.Printable):
                 envmax.append(ab.pos() + ab.extents())
             abrobot = self.robot.ComputeAABB()
 
-            envmin = np.min(np.array(envmin), 0) + abrobot.extents()
-            envmax = np.max(np.array(envmax), 0) - abrobot.extents()
+            envmin = np.min(np.array(envmin), 0.0) + abrobot.extents()
+            envmax = np.max(np.array(envmax), 0.0) - abrobot.extents()
 
             envmin[2] += 0.1
             envmax[2] += 1.0
 
-            self.bounds = np.array(((envmin[0], envmin[1], envmin[2], 0, 0, -np.pi),
-                                    (envmax[0], envmax[1], envmax[2], 0, 0, np.pi)))
+            self.bounds = np.array(((envmin[0], envmin[1], envmin[2], 0.0, 0.0, -np.pi),
+                                    (envmax[0], envmax[1], envmax[2], 0.0, 0.0, np.pi)))
 
             self.robot.SetAffineTranslationLimits(envmin, envmax)
             self.robot.SetAffineTranslationMaxVels([0.5, 0.5, 0.5, 0.5])
@@ -109,8 +109,8 @@ class Navigation(printable.Printable):
     def draw_goal(self, goal):
         center = goal[0:3]
         angle = goal[3]
-        xaxis = 0.5 * np.array((np.cos(angle), np.sin(angle), 0))
-        yaxis = 0.25 * np.array((-np.sin(angle), np.cos(angle), 0))
+        xaxis = 0.5 * np.array((np.cos(angle), np.sin(angle), 0.0))
+        yaxis = 0.25 * np.array((-np.sin(angle), np.cos(angle), 0.0))
         points = np.c_[center - xaxis, center + xaxis, center - yaxis, center + yaxis, center + xaxis,
                        center + 0.5 * xaxis + 0.5 * yaxis, center + xaxis, center + 0.5 * xaxis - 0.5 * yaxis]
         return self.env.drawlinelist(np.transpose(points), linewidth=2.0, colors=np.array((0, 1, 0)))
@@ -128,7 +128,7 @@ class Navigation(printable.Printable):
         return goal
 
     def run(self):
-        self.simulator.run(100000)
+        self.simulator.run(600)
 
         # while True:
         #     goal = self.collision_free(self.random_goal)

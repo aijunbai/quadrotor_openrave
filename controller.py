@@ -30,14 +30,17 @@ class Controller(printable.Printable):
         self.pid = addict.Dict()
 
         self.command = None
+        self.dt = None
 
     @memoized.reset()
     def update(self, command, dt):
         self.command = command
+        self.dt = dt
 
         if self.verbose:
+            print
             utils.pv('self.__class__.__name__')
-            utils.pv('self.pose', 'self.twist', 'self.acceleration')
+            utils.pv('self.dt', 'self.pose', 'self.twist', 'self.acceleration')
             utils.pv('self.position', 'self.euler', 'self.quaternion', 'self.inverse_quaternion')
             utils.pv('self.mass', 'self.inertia', 'self.gravity')
             utils.pv('self.command')
@@ -62,22 +65,26 @@ class Controller(printable.Printable):
     @property
     @memoized
     def inertia(self):
+        return np.array([0.0140331, 0.0140611, 0.0220901])
         return self.link.GetLocalInertia().diagonal()
 
     @property
     @memoized
     def pose(self):
+        """
+        Pose in order as:
+        """
         return self.robot.GetActiveDOFValues()
 
     @property
     @memoized
     def position(self):
-        return self.pose[:3]
+        return self.pose[0:3]
 
     @property
     @memoized
     def euler(self):
-        return self.pose[3:]
+        return self.pose[3:6]
 
     @property
     @memoized
@@ -109,6 +116,11 @@ class Controller(printable.Printable):
     @memoized
     def gravity(self):
         return np.linalg.norm(self.physics_engine.GetGravity())
+
+    @property
+    @memoized
+    def center_of_mass(self):
+        return self.robot.GetCenterOfMass()
 
     @memoized.reset()
     def reset(self):
@@ -146,24 +158,26 @@ class TwistController(Controller):
                              + self.quaternion[2] * self.quaternion[2])
         load_factor = utils.bound(load_factor, self.load_factor_limit)
 
-        acceleration_command = np.array([0.0, 0.0, 0.0], dtype=np.float)
+        acceleration_command = np.array([0.0, 0.0, 0.0])
+
         acceleration_command[0] = self.pid.linear.x.update(
-            self.command.twist.linear.x, self.twist.linear[0], self.acceleration[0], dt)
+            self.command.twist.linear.x, self.twist.linear[0], self.acceleration[0], self.dt)
         acceleration_command[1] = self.pid.linear.y.update(
-            self.command.twist.linear.y, self.twist.linear[1], self.acceleration[1], dt)
+            self.command.twist.linear.y, self.twist.linear[1], self.acceleration[1], self.dt)
         acceleration_command[2] = self.pid.linear.z.update(
-            self.command.twist.linear.z, self.twist.linear[2], self.acceleration[2], dt) + self.gravity
+            self.command.twist.linear.z, self.twist.linear[2], self.acceleration[2], self.dt) + self.gravity
+
         acceleration_command_body = self.to_body(acceleration_command)
 
         if self.verbose:
             utils.pv('twist_body', 'load_factor', 'acceleration_command', 'acceleration_command_body')
 
         self.command.wrench.torque.x = self.inertia[0] * self.pid.angular.x.update(
-            -acceleration_command_body[1] / self.gravity, 0.0, twist_body.angular[0], dt)
+            -acceleration_command_body[1] / self.gravity, 0.0, twist_body.angular[0], self.dt)
         self.command.wrench.torque.y = self.inertia[1] * self.pid.angular.y.update(
-            acceleration_command_body[0] / self.gravity, 0.0, twist_body.angular[1], dt)
+            acceleration_command_body[0] / self.gravity, 0.0, twist_body.angular[1], self.dt)
         self.command.wrench.torque.z = self.inertia[2] * self.pid.angular.z.update(
-            self.command.twist.angular.z, self.twist.angular[2], 0.0, dt)
+            self.command.twist.angular.z, self.twist.angular[2], 0.0, self.dt)
 
         self.command.wrench.force.x = 0.0
         self.command.wrench.force.y = 0.0
@@ -189,18 +203,19 @@ class WrenchController(Controller):
     def update(self, command, dt):
         super(WrenchController, self).update(command, dt)
 
-        g_com = self.link.GetGlobalCOM()
-        l_com = self.link.GetLocalCOM()
+        g_com = self.center_of_mass
+        l_com = self.to_body(g_com - self.position)
 
         force = np.array(
-            [self.command.wrench.force.x, self.command.wrench.force.y, self.command.wrench.force.z], dtype=np.float)
+            [self.command.wrench.force.x, self.command.wrench.force.y, self.command.wrench.force.z])
         torque = np.array(
-            [self.command.wrench.torque.x, self.command.wrench.torque.y, self.command.wrench.torque.z], dtype=np.float)
+            [self.command.wrench.torque.x, self.command.wrench.torque.y, self.command.wrench.torque.z])
 
         torque = torque - np.cross(l_com, force)
 
         if self.verbose:
-            utils.pv('g_com', 'l_com', 'force', 'torque')
+            utils.pv('g_com', 'l_com')
+            utils.pv('force', 'torque')
             utils.pv('self.from_body(force)', 'self.from_body(torque)')
 
         with self.env:
