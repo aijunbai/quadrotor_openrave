@@ -8,7 +8,9 @@ import printable
 import controller
 import addict
 import time
+import math
 import state
+import copy
 
 import openravepy as rave
 import numpy as np
@@ -17,16 +19,16 @@ __author__ = 'Aijun Bai'
 
 
 class Simulator(printable.Printable):
-    def __init__(self, env, params, sleep=False, verbose=False):
+    def __init__(self, env, state, params, sleep=False, verbose=False):
         super(Simulator, self).__init__()
 
         self.env = env
+        self.set_physics_engine(on=False)
+
+        self.state = state
         self.verbose = verbose
         self.sleep = sleep
-
         self.dt = params('timestep', 0.001)
-        self.state = state.State(self.env, verbose=self.verbose)
-        self.command = addict.Dict()
 
         self.controllers = []
         self.controllers.append(
@@ -36,9 +38,10 @@ class Simulator(printable.Printable):
         self.controllers.append(
             controller.TwistController(self.state, params=params.controller.twist, verbose=self.verbose))
 
-        self.set_physics_engine(on=False)
+        for c in self.controllers:
+            c.reset()
 
-    def run(self, total_time):
+    def run(self, command, total_time):
         """
         Run the simulation for total_time in seconds
         """
@@ -46,20 +49,16 @@ class Simulator(printable.Printable):
 
         for s in range(int(total_time / self.dt)):
             start = time.time()
+
+            shared_command = copy.deepcopy(command)
             if self.verbose:
-                print 'step: {}, time: {}'.format(s, self.get_sim_time())
+                print '\nstep: {}, time: {}'.format(s, self.get_sim_time())
 
             self.state.update()
-            self.command.clear()
-
-            self.command.pose.x = -2  # self.state.position[0]
-            self.command.pose.y = 2  # self.state.position[1]
-            self.command.pose.z = 4  # self.state.position[2]
-            self.command.pose.yaw = 0  # self.state.euler[2]
-
             for c in self.controllers:
-                c.update(self.command, self.dt)
-            self.state.apply(self.command.wrench, self.dt)
+                c.update(shared_command, self.dt)
+
+            self.state.apply(shared_command.wrench, self.dt)
             if self.sleep:
                 time.sleep(max(self.dt - time.time() + start, 0.0))
 

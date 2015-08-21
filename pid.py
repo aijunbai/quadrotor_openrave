@@ -48,9 +48,9 @@ class PIDController(printable.Printable):
             self.state.input = (dt * input_ + self.params.time_constant * self.state.input) / \
                                (dt + self.params.time_constant)
 
-        return self._update(self.state.input - x, dx, dt)
+        return self.pid(self.state.input - x, dx, dt)
 
-    def _update(self, error, dx, dt):
+    def pid(self, error, dx, dt):
         if self.verbose:
             print "error: {}, dx: {}, dt: {}".format(error, dx, dt)
 

@@ -9,7 +9,9 @@ import trajoptpy
 import simulator
 import printable
 import addict
+import math
 import parser
+import state
 import openravepy as rave
 import numpy as np
 
@@ -23,8 +25,11 @@ class Navigation(printable.Printable):
         self.verbose = verbose
         self.env = robot.GetEnv()
         self.robot = robot
+        self.robot_state = state.State(self.env, verbose=self.verbose)
         self.params = parser.Yaml(file_name='params/simulator.yaml')
-        self.simulator = simulator.Simulator(self.env, self.params, verbose=self.verbose)
+
+        self.simulator = simulator.Simulator(
+            self.env, self.robot_state, self.params, verbose=self.verbose)
 
         with self.env:
             envmin = []
@@ -128,7 +133,15 @@ class Navigation(printable.Printable):
         return goal
 
     def run(self):
-        self.simulator.run(3600)
+
+        command = addict.Dict()
+
+        command.pose.x = self.robot_state.position[0] - 1
+        command.pose.y = self.robot_state.position[1] + 1
+        command.pose.z = self.robot_state.position[2] - 1
+        command.pose.yaw = self.robot_state.euler[2]
+
+        self.simulator.run(command, 3600)
 
         # while True:
         #     goal = self.collision_free(self.random_goal)
