@@ -121,7 +121,7 @@ class Navigation(printable.Printable):
         return self.env.drawlinelist(np.transpose(points), linewidth=2.0, colors=np.array((0, 1, 0)))
 
     def collision_free(self, method):
-        state = self.robot.GetActiveDOFValues()
+        s = self.robot.GetActiveDOFValues()
         goal = None
         with self.robot:
             while True:
@@ -129,16 +129,17 @@ class Navigation(printable.Printable):
                 self.robot.SetActiveDOFValues(goal)
                 if not self.env.CheckCollision(self.robot):
                     break
-        self.robot.SetActiveDOFValues(state)
+        self.robot.SetActiveDOFValues(s)
         return goal
 
     def run(self):
 
         command = addict.Dict()
 
-        command.pose.x = self.robot_state.position[0] - 1
-        command.pose.y = self.robot_state.position[1] + 1
-        command.pose.z = self.robot_state.position[2] - 1
+        delta = 2.0
+        command.pose.x = self.robot_state.position[0] + delta
+        command.pose.y = self.robot_state.position[1] + delta
+        command.pose.z = self.robot_state.position[2] + delta
         command.pose.yaw = self.robot_state.euler[2]
 
         self.simulator.run(command, 3600)

@@ -96,7 +96,18 @@ class State(printable.Printable):
     @property
     @memoized
     def center_of_mass(self):
-        return self.robot.GetCenterOfMass()
+        c = np.matrix([0.0, 0.0, 0.0, 0.0]).T
+        m = 0.0
+
+        for l in self.robot.GetLinks():
+            c += l.GetTransform() * np.matrix(np.r_[l.GetCOMOffset(), 1.0]).T * l.GetMass()
+            m += l.GetMass()
+
+        if m > 0.0:
+            c /= m
+
+        c = np.array(c.T[0]).flatten()[0:3] / m
+        return c
 
     def to_body(self, v):
         """
