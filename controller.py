@@ -9,6 +9,7 @@ import copy
 import pid
 import printable
 import addict
+import angles
 import numpy as np
 import openravepy as rave
 from tf import transformations
@@ -60,6 +61,9 @@ class TwistController(Controller):
     def update(self, command, dt):
         super(TwistController, self).update(command, dt)
 
+        if 'twist' not in self.command:
+            return
+
         twist_body = addict.Dict()
         twist_body.linear = self.state.to_body(self.state.twist.linear)
         twist_body.angular = self.state.to_body(self.state.twist.angular)
@@ -77,8 +81,8 @@ class TwistController(Controller):
         acceleration_command[1] = self.pid.linear.y.update(
             self.command.twist.linear.y, self.state.twist.linear[1], self.state.acceleration[1], self.dt)
         acceleration_command[2] = self.pid.linear.z.update(
-            self.command.twist.linear.z, self.state.twist.linear[2], self.state.acceleration[2], self.dt) +\
-            self.state.gravity
+            self.command.twist.linear.z, self.state.twist.linear[2], self.state.acceleration[2], self.dt) + \
+                                  self.state.gravity
 
         acceleration_command_body = self.state.to_body(acceleration_command)
 
@@ -112,8 +116,41 @@ class PoseController(Controller):
     def __init__(self, state, params=None, verbose=False):
         super(PoseController, self).__init__(state, verbose=verbose)
 
+        self.pid.x = pid.PIDController(params.xy)
+        self.pid.y = pid.PIDController(params.xy)
+        self.pid.z = pid.PIDController(params.z)
+        self.pid.yaw = pid.PIDController(params.yaw)
+
     def update(self, command, dt):
         super(PoseController, self).update(command, dt)
+
+        if 'pose' not in self.command:
+            return
+
+        twist = addict.Dict()
+        twist.linear.x = self.pid.x.update(self.command.pose.x, self.state.position[0],
+                                           self.state.twist.linear[0], self.dt)
+        twist.linear.y = self.pid.y.update(self.command.pose.y, self.state.position[1],
+                                           self.state.twist.linear[1], self.dt)
+        twist.linear.z = self.pid.z.update(self.command.pose.z, self.state.position[2],
+                                           self.state.twist.linear[2], self.dt)
+
+        yaw_command = angles.normalize(self.command.pose.yaw, self.state.euler[2] - math.pi,
+                                       self.state.euler[2] + math.pi)
+        twist.angular.z = self.pid.yaw.update(yaw_command, self.state.euler[2],
+                                              self.state.twist.angular[2], self.dt)
+
+        if 'twist' in self.command:
+            self.command.twist.linear.x += twist.linear.x
+            self.command.twist.linear.y += twist.linear.y
+            self.command.twist.linear.z += twist.linear.z
+            self.command.twist.angular.z += twist.angular.z
+        else:
+            self.command.twist = twist
+
+        if self.verbose:
+            utils.pv('self.state.euler[2]', 'yaw_command')
+            utils.pv('twist', 'self.command.twist')
 
 
 class TrajectoryController(Controller):

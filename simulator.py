@@ -17,11 +17,12 @@ __author__ = 'Aijun Bai'
 
 
 class Simulator(printable.Printable):
-    def __init__(self, env, params, verbose=False):
+    def __init__(self, env, params, sleep=False, verbose=False):
         super(Simulator, self).__init__()
 
         self.env = env
         self.verbose = verbose
+        self.sleep = sleep
 
         self.dt = params('timestep', 0.001)
         self.state = state.State(self.env, verbose=self.verbose)
@@ -42,25 +43,25 @@ class Simulator(printable.Printable):
         Run the simulation for total_time in seconds
         """
         self.set_physics_engine(on=True)
-        steps = int(total_time / self.dt)
 
-        for s in range(steps):
+        for s in range(int(total_time / self.dt)):
             start = time.time()
-            print 'step: {}, time: {}'.format(s, self.get_sim_time())
+            if self.verbose:
+                print 'step: {}, time: {}'.format(s, self.get_sim_time())
 
             self.state.update()
-
             self.command.clear()
-            self.command.twist.linear.x = 0.0
-            self.command.twist.linear.y = 0.0
-            self.command.twist.linear.z = 0.0
-            self.command.twist.angular.z = 0.1
+
+            self.command.pose.x = -2  # self.state.position[0]
+            self.command.pose.y = 2  # self.state.position[1]
+            self.command.pose.z = 4  # self.state.position[2]
+            self.command.pose.yaw = 0  # self.state.euler[2]
 
             for c in self.controllers:
                 c.update(self.command, self.dt)
-
             self.state.apply(self.command.wrench, self.dt)
-            time.sleep(max(self.dt - time.time() + start, 0.0))
+            if self.sleep:
+                time.sleep(max(self.dt - time.time() + start, 0.0))
 
         self.set_physics_engine(on=False)
 

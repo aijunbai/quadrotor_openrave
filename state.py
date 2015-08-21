@@ -20,7 +20,6 @@ class State(printable.Printable):
         self.verbose = verbose
         self.env = env
         self.robot = env.GetRobots()[0]
-        self.kinbody = self.env.GetKinBody(self.robot.GetName())
         self.physics_engine = env.GetPhysicsEngine()
         self.link = self.robot.GetLink('base_link')
 
@@ -29,8 +28,9 @@ class State(printable.Printable):
         if self.verbose:
             print
             utils.pv('self.__class__.__name__')
-            utils.pv('self.pose', 'self.twist', 'self.acceleration')
-            utils.pv('self.position', 'self.euler', 'self.quaternion', 'self.inverse_quaternion')
+            utils.pv('self.pose', 'self.position')
+            utils.pv('self.euler', 'self.quaternion', 'self.inverse_quaternion')
+            utils.pv('self.twist', 'self.acceleration')
             utils.pv('self.mass', 'self.inertia', 'self.gravity')
 
     @property
@@ -86,7 +86,7 @@ class State(printable.Printable):
     @property
     @memoized
     def acceleration(self):
-        return self.kinbody.GetLinkAccelerations([])[0][0:3]
+        return self.robot.GetLinkAccelerations([])[0][0:3]
 
     @property
     @memoized
@@ -130,4 +130,3 @@ class State(printable.Printable):
             self.link.SetForce(self.from_body(force), g_com, True)
             self.link.SetTorque(self.from_body(torque), True)
             self.env.StepSimulation(dt)
-

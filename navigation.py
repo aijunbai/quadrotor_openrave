@@ -24,7 +24,7 @@ class Navigation(printable.Printable):
         self.env = robot.GetEnv()
         self.robot = robot
         self.params = parser.Yaml(file_name='params/simulator.yaml')
-        self.simulator = simulator.Simulator(self.env, self.params, self.verbose)
+        self.simulator = simulator.Simulator(self.env, self.params, verbose=self.verbose)
 
         with self.env:
             envmin = []
@@ -128,7 +128,7 @@ class Navigation(printable.Printable):
         return goal
 
     def run(self):
-        self.simulator.run(600)
+        self.simulator.run(3600)
 
         # while True:
         #     goal = self.collision_free(self.random_goal)
