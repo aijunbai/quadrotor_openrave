@@ -32,6 +32,7 @@ class State(printable.Printable):
             utils.pv('self.euler', 'self.quaternion', 'self.inverse_quaternion')
             utils.pv('self.twist', 'self.acceleration')
             utils.pv('self.mass', 'self.inertia', 'self.gravity')
+            utils.pv('self.center_of_mass', 'self.robot.GetCenterOfMass()')
 
     @property
     @memoized
@@ -42,7 +43,7 @@ class State(printable.Printable):
     @memoized
     def inertia(self):
         return np.array([0.0140331, 0.0140611, 0.0220901])
-        # return self.link.GetLocalInertia().diagonal()
+        return self.link.GetPrincipalMomentsOfInertia()
 
     @property
     @memoized
@@ -106,7 +107,7 @@ class State(printable.Printable):
         if m > 0.0:
             c /= m
 
-        c = np.array(c.T[0]).flatten()[0:3] / m
+        c = np.array(c.T[0]).flatten()[0:3]
         return c
 
     def to_body(self, v):
@@ -122,22 +123,26 @@ class State(printable.Printable):
         return utils.rotate(v, self.quaternion)
 
     def apply(self, wrench, dt):
-        g_com = self.center_of_mass
-        l_com = self.to_body(g_com - self.position)
+        if 'force' in wrench and 'torque' in wrench:
+            g_com = self.center_of_mass
+            l_com = self.to_body(g_com - self.position)
 
-        force = np.array([wrench.force.x, wrench.force.y, wrench.force.z])
-        torque = np.array([wrench.torque.x, wrench.torque.y, wrench.torque.z])
+            force = np.array([wrench.force.x, wrench.force.y, wrench.force.z])
+            torque = np.array([wrench.torque.x, wrench.torque.y, wrench.torque.z])
 
-        torque = torque - np.cross(l_com, force)
+            torque = torque - np.cross(l_com, force)
 
-        if self.verbose:
-            print
-            utils.pv('self.__class__.__name__')
-            utils.pv('g_com', 'l_com')
-            utils.pv('force', 'torque')
-            utils.pv('self.from_body(force)', 'self.from_body(torque)')
+            if self.verbose:
+                print
+                utils.pv('self.__class__.__name__')
+                utils.pv('g_com', 'l_com')
+                utils.pv('force', 'torque')
+                utils.pv('self.from_body(force)', 'self.from_body(torque)')
+
+            with self.env:
+                self.link.SetForce(self.from_body(force), g_com, True)
+                self.link.SetTorque(self.from_body(torque), True)
 
         with self.env:
-            self.link.SetForce(self.from_body(force), g_com, True)
-            self.link.SetTorque(self.from_body(torque), True)
             self.env.StepSimulation(dt)
+

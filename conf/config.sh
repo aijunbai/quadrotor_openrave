@@ -19,6 +19,8 @@
 
 set -o nounset                              # Treat unset variables as an error
 
+export TRAJOPT_LOG_THRESH="WARN"
+
 PYTHON=`which python`
 BASH=`which bash`
 

@@ -10,7 +10,7 @@ import addict
 import time
 import math
 import state
-import copy
+import utils
 
 import openravepy as rave
 import numpy as np
@@ -50,15 +50,17 @@ class Simulator(printable.Printable):
         for s in range(int(total_time / self.dt)):
             start = time.time()
 
-            shared_command = copy.deepcopy(command)
+            pipeline = utils.makehash()
+            pipeline[0] = command
+
             if self.verbose:
                 print '\nstep: {}, time: {}'.format(s, self.get_sim_time())
 
             self.state.update()
-            for c in self.controllers:
-                c.update(shared_command, self.dt)
+            for i, c in enumerate(self.controllers):
+                pipeline[i+1] = c.update(pipeline[i], self.dt)
 
-            self.state.apply(shared_command.wrench, self.dt)
+            self.state.apply(pipeline[len(self.controllers)].wrench, self.dt)
             if self.sleep:
                 time.sleep(max(self.dt - time.time() + start, 0.0))
 

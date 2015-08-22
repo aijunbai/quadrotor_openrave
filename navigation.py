@@ -12,6 +12,7 @@ import addict
 import math
 import parser
 import state
+import angles
 import openravepy as rave
 import numpy as np
 
@@ -133,14 +134,18 @@ class Navigation(printable.Printable):
         return goal
 
     def run(self):
-
         command = addict.Dict()
+        command.trajectory = []
 
-        delta = 2.0
-        command.pose.x = self.robot_state.position[0] + delta
-        command.pose.y = self.robot_state.position[1] + delta
-        command.pose.z = self.robot_state.position[2] + delta
-        command.pose.yaw = self.robot_state.euler[2]
+        for i in range(1, 10):
+            for d in range(0, 360, 15):
+                theta = angles.d2r(d)
+                r = 2.0 * math.sin(4.0 * theta)
+                x = r * math.cos(theta)
+                y = r * math.sin(theta)
+                z = self.robot_state.position[2]
+                yaw = self.robot_state.euler[2]
+                command.trajectory.append(addict.Dict(x=x, y=y, z=z, yaw=yaw))
 
         self.simulator.run(command, 3600)
 
