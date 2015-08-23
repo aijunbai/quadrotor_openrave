@@ -29,12 +29,6 @@ class Controller(printable.Printable):
         self.input_ = None
         self.output = None
 
-    def reset(self):
-        Controller.reset_tree(self.pid)
-
-        self.input_ = None
-        self.output = None
-
     def update(self, input_, dt):
         self.input_ = input_
         self.output = addict.Dict()
@@ -43,6 +37,12 @@ class Controller(printable.Printable):
             print
             utils.pv('self.__class__.__name__')
             utils.pv('self.input_', 'dt')
+
+    def reset(self):
+        Controller.reset_tree(self.pid)
+
+        self.input_ = None
+        self.output = None
 
     @staticmethod
     def reset_tree(t):
@@ -168,18 +168,18 @@ class TrajectoryController(Controller):
     def update(self, input_, dt):
         super(TrajectoryController, self).update(input_, dt)
 
-        if 'trajectory' in self.input_ and len(self.input_.trajectory):
+        if 'trajectory' in self.input_ and self.traj_idx < len(self.input_.trajectory):
             self.output.pose = self.input_.trajectory[self.traj_idx]
 
-            if self.traj_idx < len(self.input_.trajectory) - 1:
-                if utils.norm(
-                        np.r_[self.state.position, self.state.euler[2]],
-                        np.r_[self.output.pose.x, self.output.pose.y,
-                              self.output.pose.z, self.output.pose.yaw]) < self.error:
-                    self.traj_idx += 1
+            if utils.norm(
+                    np.r_[self.state.position, self.state.euler[2]],
+                    np.r_[self.output.pose.x, self.output.pose.y,
+                          self.output.pose.z, self.output.pose.yaw]) < self.error:
+                self.traj_idx += 1
+                if self.traj_idx < len(self.input_.trajectory):
                     self.output.pose = self.input_.trajectory[self.traj_idx]
 
-                if self.verbose:
-                    utils.pv('self.output')
+            if self.verbose:
+                utils.pv('self.output')
 
         return self.output

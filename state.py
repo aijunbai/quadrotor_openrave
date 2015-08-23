@@ -42,7 +42,7 @@ class State(printable.Printable):
     @property
     @memoized
     def inertia(self):
-        return np.array([0.0140331, 0.0140611, 0.0220901])
+        return np.r_[0.0140331, 0.0140611, 0.0220901]
         return self.link.GetPrincipalMomentsOfInertia()
 
     @property
@@ -123,12 +123,14 @@ class State(printable.Printable):
         return utils.rotate(v, self.quaternion)
 
     def apply(self, wrench, dt):
+        ret = False
+
         if 'force' in wrench and 'torque' in wrench:
             g_com = self.center_of_mass
             l_com = self.to_body(g_com - self.position)
 
-            force = np.array([wrench.force.x, wrench.force.y, wrench.force.z])
-            torque = np.array([wrench.torque.x, wrench.torque.y, wrench.torque.z])
+            force = np.r_[wrench.force.x, wrench.force.y, wrench.force.z]
+            torque = np.r_[wrench.torque.x, wrench.torque.y, wrench.torque.z]
 
             torque = torque - np.cross(l_com, force)
 
@@ -142,7 +144,10 @@ class State(printable.Printable):
             with self.env:
                 self.link.SetForce(self.from_body(force), g_com, True)
                 self.link.SetTorque(self.from_body(torque), True)
+                ret = True
 
         with self.env:
             self.env.StepSimulation(dt)
+
+        return ret
 

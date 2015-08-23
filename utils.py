@@ -79,7 +79,7 @@ def rotate(v, q):
     """
     Rotate vector v according to quaternion q
     """
-    q2 = np.array([v[0], v[1], v[2], 0.0])
+    q2 = np.r_[v[0], v[1], v[2], 0.0]
     return transformations.quaternion_multiply(
         transformations.quaternion_multiply(q, q2),
         transformations.quaternion_conjugate(q))[0:3]

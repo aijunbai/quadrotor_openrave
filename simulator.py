@@ -38,16 +38,31 @@ class Simulator(printable.Printable):
         self.controllers.append(
             controller.TwistController(self.state, params=params.controller.twist, verbose=self.verbose))
 
+    def reset(self):
         for c in self.controllers:
             c.reset()
 
-    def run(self, command, total_time):
+    def follow(self, traj):
+        command = addict.Dict()
+        command.trajectory = []
+
+        for t in traj:
+            pose = addict.Dict(x=t[0], y=t[1], z=t[2], yaw=t[5])
+            command.trajectory.append(pose)
+
+        self.run(command)
+
+    def run(self, command, max_steps=10000):
         """
         Run the simulation for total_time in seconds
         """
+        self.reset()
         self.set_physics_engine(on=True)
+        self.simulate(command, max_steps)
+        self.set_physics_engine(on=False)
 
-        for s in range(int(total_time / self.dt)):
+    def simulate(self, command, max_steps):
+        for s in xrange(max_steps):
             start = time.time()
 
             pipeline = utils.makehash()
@@ -58,13 +73,14 @@ class Simulator(printable.Printable):
 
             self.state.update()
             for i, c in enumerate(self.controllers):
-                pipeline[i+1] = c.update(pipeline[i], self.dt)
+                pipeline[i + 1] = c.update(pipeline[i], self.dt)
 
-            self.state.apply(pipeline[len(self.controllers)].wrench, self.dt)
+            status = self.state.apply(pipeline[len(self.controllers)].wrench, self.dt)
+            if not status:
+                break
+
             if self.sleep:
                 time.sleep(max(self.dt - time.time() + start, 0.0))
-
-        self.set_physics_engine(on=False)
 
     def set_physics_engine(self, on=False):
         with self.env:

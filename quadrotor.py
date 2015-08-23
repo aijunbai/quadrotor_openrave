@@ -22,10 +22,10 @@ def run(args=None):
     parser = OptionParser(description='Navigation planning using trajopt.')
     OpenRAVEGlobalArguments.addOptions(parser)
 
-    parser.add_option('-s', '--scene',
+    parser.add_option('--scene',
                       action='store', type='string', dest='scene', default='data/quadrotor.env.xml',
                       help='Scene file to load (default=%default)')
-    parser.add_option('-v', '--verbose',
+    parser.add_option('--verbose',
                       action='store_true', dest='verbose', default=False,
                       help='Set verbose output')
 
@@ -38,7 +38,7 @@ def run(args=None):
     env.UpdatePublishedBodies()
 
     time.sleep(0.1)  # give time for environment to update
-    navi = navigation.Navigation(robot, verbose=options.verbose)
+    navi = navigation.Navigation(robot, sleep=False, verbose=options.verbose)
     navi.run()
 
 
