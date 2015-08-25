@@ -11,6 +11,7 @@ import time
 import math
 import state
 import utils
+import aerodynamics
 
 import openravepy as rave
 import numpy as np
@@ -29,6 +30,10 @@ class Simulator(printable.Printable):
         self.verbose = verbose
         self.sleep = sleep
         self.dt = params('timestep', 0.001)
+        self.wind = np.r_[0.0, 0.0, 0.0]
+
+        self.aerodynamics = aerodynamics.QuadrotorAerodynamics(
+            self.state, self.wind, params=params.aerodynamics, verbose=self.verbose)
 
         self.controllers = []
         self.controllers.append(
@@ -58,29 +63,35 @@ class Simulator(printable.Printable):
         """
         self.reset()
         self.set_physics_engine(on=True)
-        self.simulate(command, max_steps)
+        success, step = self.simulate(command, max_steps)
         self.set_physics_engine(on=False)
+        return success, step, max_steps
 
     def simulate(self, command, max_steps):
-        for s in xrange(max_steps):
+        for step in xrange(max_steps):
             start = time.time()
+            if self.verbose:
+                print '\nstep: {}, time: {}'.format(step, self.get_sim_time())
 
             pipeline = utils.makehash()
             pipeline[0] = command
-
-            if self.verbose:
-                print '\nstep: {}, time: {}'.format(s, self.get_sim_time())
-
             self.state.update()
             for i, c in enumerate(self.controllers):
                 pipeline[i + 1] = c.update(pipeline[i], self.dt)
 
-            status = self.state.apply(pipeline[len(self.controllers)].wrench, self.dt)
-            if not status:
+            wrench = self.aerodynamics.apply(pipeline[len(self.controllers)].wrench, self.dt)
+            status = self.state.apply(wrench, self.dt)
+            if not status or not self.state.valid():
+                if not self.state.valid():
+                    utils.pv('self.state.load_factor')
+                    utils.pv('self.state.position')
+                    return False, step
                 break
 
             if self.sleep:
                 time.sleep(max(self.dt - time.time() + start, 0.0))
+
+        return True, step
 
     def set_physics_engine(self, on=False):
         with self.env:

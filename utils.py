@@ -60,7 +60,7 @@ def mean(samples):
     return sum(samples) / len(samples) if len(samples) else 0.0
 
 
-def norm(a, b):
+def dist(a, b):
     a_ = np.array(a)
     b_ = np.array(b)
 
@@ -93,3 +93,7 @@ def bound(value, limit):
     if 0.0 < limit < abs(value):
         return np.sign(value) * limit
     return value
+
+
+def minmax(min_, x, max_):
+    return min(max(min_, x), max_)

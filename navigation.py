@@ -1,5 +1,7 @@
 # coding=utf-8
 
+from __future__ import division
+
 __author__ = 'Aijun Bai'
 
 import time
@@ -40,12 +42,11 @@ class Navigation(printable.Printable):
                 envmin.append(ab.pos() - ab.extents())
                 envmax.append(ab.pos() + ab.extents())
             abrobot = self.robot.ComputeAABB()
-
             envmin = np.min(np.array(envmin), 0.0) + abrobot.extents()
             envmax = np.max(np.array(envmax), 0.0) - abrobot.extents()
-
-            envmin[2] += 0.1
-            envmax[2] += 1.0
+            envmin -= np.ones_like(envmin)
+            envmax += np.ones_like(envmax)
+            envmin[2] = max(envmin[2], 0.0)
 
             self.bounds = np.array(((envmin[0], envmin[1], envmin[2], 0.0, 0.0, -np.pi),
                                     (envmax[0], envmax[1], envmax[2], 0.0, 0.0, np.pi)))
@@ -61,7 +62,7 @@ class Navigation(printable.Printable):
         return self.bounds[0, :] + np.random.rand(6) * (self.bounds[1, :] - self.bounds[0, :])
 
     @staticmethod
-    def make_fullbody_request(start_joints, end_joints, n_steps):
+    def make_fullbody_request(end_joints, inittraj, n_steps):
         if isinstance(end_joints, np.ndarray):
             end_joints = end_joints.tolist()
 
@@ -108,23 +109,25 @@ class Navigation(printable.Printable):
             ],
             "init_info": {
                 "type": "given_traj",
+                "data": [row.tolist() for row in inittraj]
             }
         }
-
-        inittraj = mu.linspace2d(start_joints, end_joints, n_steps)
-        d["init_info"]["data"] = [row.tolist() for row in inittraj]
 
         return d
 
     def execute_trajectory(self, traj, physics=False):
-        self.robot.SetActiveDOFValues(traj[0])
+        for _ in range(2):
+            self.robot.SetActiveDOFValues(traj[0])
 
-        if physics:
-            self.simulator.follow(traj)
-        else:
-            for (i, row) in enumerate(traj):
-                self.robot.SetActiveDOFValues(row)
-                time.sleep(0.1)
+            if physics:
+                self.simulator.follow(traj)
+            else:
+                for (i, row) in enumerate(traj):
+                    self.robot.SetActiveDOFValues(row)
+                    time.sleep(0.1)
+
+            # if raw_input("Play again (y/n)?") != 'y':
+            #     break
 
     def draw_goal(self, goal):
         pose = addict.Dict(x=goal[0], y=goal[1], z=goal[2], yaw=goal[5])
@@ -142,11 +145,9 @@ class Navigation(printable.Printable):
     def draw_trajectory(self, traj):
         if len(traj):
             points = np.c_[np.r_[traj[0][0:3]]]
-
             for i, pose in enumerate(traj):
                 if i != 0:
                     points = np.c_[points, np.r_[pose[0:3]]]
-
             return self.env.drawlinestrip(
                 points.T, linewidth=2.0, colors=np.array((0, 1, 0)))
         return None
@@ -161,70 +162,123 @@ class Navigation(printable.Printable):
                     break
         return goal
 
-    def test(self):
-        command = addict.Dict()
-        command.trajectory = []
+    def test(self, command):
+        start_pose = self.robot.GetActiveDOFValues()
+        experiments, success, progress = 0, 0, 0.0
+        while True:
+            self.robot.SetActiveDOFValues(start_pose)
+            experiments += 1
+            ret = self.simulator.run(command)
+            success += ret[0]
+            progress = (progress * (experiments - 1) + ret[1] / ret[2]) / experiments
+            utils.pv('experiments', 'success', 'success/experiments', 'progress')
+            time.sleep(1.0)
 
-        for d in range(0, 361, 5):
+    def test_twist(self):
+        command = addict.Dict()
+        command.twist.linear.x = 0.0
+        command.twist.linear.y = 0.0
+        command.twist.linear.z = 0.0
+        command.twist.angular.z = 0.1
+
+        self.test(command)
+
+    def test_traj(self):
+        traj = []
+        for d in range(0, 361, 2):
             theta = angles.d2r(d)
-            r = 2.0 * math.sin(4.0 * theta)
+            r = 3.0
             x = r * math.cos(theta)
             y = r * math.sin(theta)
-            z = self.robot_state.position[2]
-            yaw = self.robot_state.euler[2]
-            pose = addict.Dict(x=x, y=y, z=z, yaw=yaw)
-            command.trajectory.append(pose)
+            z = self.robot_state.position[2] + math.cos(theta + angles.d2r(45.0))
+            yaw = 0
+            traj.append(np.r_[x, y, z, 0.0, 0.0, yaw])
 
-        self.simulator.run(command)
+        h = self.draw_trajectory(traj)
+        command = addict.Dict()
+        command.trajectory = [
+            addict.Dict(x=t[0], y=t[1], z=t[2], yaw=t[5]) for t in traj]
+
+        self.test(command)
 
     def run(self):
         while True:
             handlers = []
             start_pose = self.robot.GetActiveDOFValues()
-            # goal = self.collision_free(self.random_goal)
-            goal = np.r_[2.0, 2.0, 1.0, 0.0, 0.0, 0.1]
+            goal = self.collision_free(self.random_goal)
             handlers.append(self.draw_goal(goal))
             self.robot.SetActiveDOFValues(start_pose)
 
-            traj, total_cost = self.plan(start_pose, goal)
+            traj, total_cost = self.plan(start_pose, goal, multi_initialization=100)
+            if traj is not None:
+                handlers.append(self.draw_trajectory(traj))
+                if self.verbose:
+                    utils.pv('traj')
+                    utils.pv('total_cost')
+                self.execute_trajectory(traj, physics=False)
+                self.robot.SetActiveDOFValues(goal)
+
+            time.sleep(1)
+
+    def plan(self, start_pose, goal, multi_initialization=1):
+        if self.verbose:
+            print 'planning to: {}'.format(goal)
+
+        n_steps = 30
+        waypoint_step = (n_steps - 1) // 2
+        waypoints = [(np.r_[start_pose] + np.r_[goal]) / 2]
+        solutions = []
+
+        for _ in range(multi_initialization - 1):
+            waypoints.append(self.collision_free(self.random_goal))
+
+        for i, waypoint in enumerate(waypoints):
+            if self.verbose:
+                utils.pv('i', 'waypoint')
+            inittraj = np.empty((n_steps, 6))
+            inittraj[:waypoint_step+1] = mu.linspace2d(start_pose, waypoint, waypoint_step+1)
+            inittraj[waypoint_step:] = mu.linspace2d(waypoint, goal, n_steps - waypoint_step)
+
+            request = self.make_fullbody_request(goal, inittraj, n_steps)
+            prob = trajoptpy.ConstructProblem(json.dumps(request), self.env)
+
+            def constraint(dofs):
+                valid = True
+                valid &= abs(dofs[3]) < 0.1
+                valid &= abs(dofs[4]) < 0.1
+                if valid:
+                    s = self.robot.GetActiveDOFValues()
+                    self.robot.SetActiveDOFValues(dofs)
+                    valid &= not self.env.CheckCollision(self.robot)
+                    self.robot.SetActiveDOFValues(s)
+                return 0 if valid else 1
+
+            for t in range(1, n_steps):
+                prob.AddConstraint(
+                    constraint, [(t, j) for j in range(6)], "EQ", "constraint%i" % t)
+
+            result = trajoptpy.OptimizeProblem(prob)
+            self.robot.SetActiveDOFValues(start_pose)
+            traj = result.GetTraj()
+            prob.SetRobotActiveDOFs()
+            total_cost = sum(cost[1] for cost in result.GetCosts())
+            h = self.draw_trajectory(traj)
 
             if traj is not None and len(traj):
-                handlers.append(self.draw_trajectory(traj))
                 collision = not check_traj.traj_is_safe(traj, self.robot)
                 self.robot.SetActiveDOFValues(start_pose)
 
                 if not collision:
                     if self.verbose:
                         print "trajectory is safe! :)"
-                    self.execute_trajectory(traj, False)
+                    solutions.append((traj, total_cost))
+                    if i == 0:
+                        break
                 else:
                     if self.verbose:
                         print "trajectory contains a collision :("
 
-            time.sleep(1)
+        if len(solutions):
+            return sorted(solutions, key=lambda x: x[1])[0]
 
-    def plan(self, start_pose, goal):
-        if self.verbose:
-            print 'planning to: {}'.format(goal)
-
-        n_steps = 30
-        request = self.make_fullbody_request(start_pose, goal, n_steps)
-        prob = trajoptpy.ConstructProblem(json.dumps(request), self.env)
-
-        def collision_checker(dofs):
-            s = self.robot.GetActiveDOFValues()
-            self.robot.SetActiveDOFValues(dofs)
-            col = self.env.CheckCollision(self.robot)
-            self.robot.SetActiveDOFValues(s)
-            return col
-
-        for t in range(1, n_steps):
-            prob.AddConstraint(
-                collision_checker, [(t, j) for j in range(6)], "EQ", "col%i" % t)
-
-        result = trajoptpy.OptimizeProblem(prob)
-        self.robot.SetActiveDOFValues(start_pose)
-        traj = result.GetTraj()
-        total_cost = sum(cost[1] for cost in result.GetCosts())
-
-        return traj, total_cost
+        return None, None

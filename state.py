@@ -21,7 +21,7 @@ class State(printable.Printable):
         self.env = env
         self.robot = env.GetRobots()[0]
         self.physics_engine = env.GetPhysicsEngine()
-        self.link = self.robot.GetLink('base_link')
+        self.base_link = self.robot.GetLink('base_link')
 
     @memoized.reset()
     def update(self):
@@ -42,8 +42,15 @@ class State(printable.Printable):
     @property
     @memoized
     def inertia(self):
-        return np.r_[0.0140331, 0.0140611, 0.0220901]
-        return self.link.GetPrincipalMomentsOfInertia()
+        j = self.base_link.GetLocalInertia()
+
+        for l in self.robot.GetLinks():
+            if l != self.base_link:
+                r = np.matrix(np.r_[self.center_of_mass - l.GetGlobalCOM()]).T
+                offset = r.T.dot(r).item(0, 0) * np.identity(3) - r.dot(r.T)
+                j += l.GetLocalInertia() + l.GetMass() * offset
+
+        return j.diagonal()
 
     @property
     @memoized
@@ -75,13 +82,18 @@ class State(printable.Printable):
 
     @property
     @memoized
+    def rotation_matrix(self):
+        return transformations.quaternion_matrix(self.quaternion)
+
+    @property
+    @memoized
     def inverse_quaternion(self):
         return transformations.quaternion_inverse(self.quaternion)
 
     @property
     @memoized
     def twist(self):
-        twist = {'linear': self.link.GetVelocity()[0:3], 'angular': self.link.GetVelocity()[3:6]}
+        twist = {'linear': self.base_link.GetVelocity()[0:3], 'angular': self.base_link.GetVelocity()[3:6]}
         return addict.Dict(twist)
 
     @property
@@ -110,6 +122,14 @@ class State(printable.Printable):
         c = np.array(c.T[0]).flatten()[0:3]
         return c
 
+    @property
+    @memoized
+    def load_factor(self):
+        return 1.0 / (self.quaternion[3] * self.quaternion[3]
+                      - self.quaternion[0] * self.quaternion[0]
+                      - self.quaternion[1] * self.quaternion[1]
+                      + self.quaternion[2] * self.quaternion[2])
+
     def to_body(self, v):
         """
         Convert vel/accel from world frame to body frame
@@ -128,10 +148,8 @@ class State(printable.Printable):
         if 'force' in wrench and 'torque' in wrench:
             g_com = self.center_of_mass
             l_com = self.to_body(g_com - self.position)
-
             force = np.r_[wrench.force.x, wrench.force.y, wrench.force.z]
             torque = np.r_[wrench.torque.x, wrench.torque.y, wrench.torque.z]
-
             torque = torque - np.cross(l_com, force)
 
             if self.verbose:
@@ -142,12 +160,15 @@ class State(printable.Printable):
                 utils.pv('self.from_body(force)', 'self.from_body(torque)')
 
             with self.env:
-                self.link.SetForce(self.from_body(force), g_com, True)
-                self.link.SetTorque(self.from_body(torque), True)
+                self.base_link.SetForce(self.from_body(force), g_com, True)
+                self.base_link.SetTorque(self.from_body(torque), True)
                 ret = True
 
         with self.env:
             self.env.StepSimulation(dt)
 
         return ret
+
+    def valid(self):
+        return self.load_factor >= 0.0 and self.position[2] >= 0.0
 
