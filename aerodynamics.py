@@ -33,6 +33,13 @@ class DragModel(printable.Printable):
         self.u = np.zeros(6)
         self.y = np.zeros(6)
 
+    def limit(self, min_, max_):
+        for x in np.nditer(self.u, op_flags=['readwrite']):
+            if math.isnan(x):
+                print 'drag_model contains NaN values: {}'.format(self.drag_model.u)
+                x[...] = 0.0
+            x[...] = utils.minmax(min_, x, max_)
+
 
 class QuadrotorAerodynamics(printable.Printable):
     def __init__(self, state, wind, params, verbose=False):
@@ -45,7 +52,6 @@ class QuadrotorAerodynamics(printable.Printable):
         self.drag_model.reset()
 
     def apply(self, wrench, dt):
-        return wrench
         self.drag_model.u[0] = (self.state.twist.linear[0] - self.wind[0])
         self.drag_model.u[1] = -(self.state.twist.linear[1] - self.wind[1])
         self.drag_model.u[2] = -(self.state.twist.linear[2] - self.wind[2])
@@ -56,28 +62,33 @@ class QuadrotorAerodynamics(printable.Printable):
         self.drag_model.u[0:3] = utils.rotate(self.drag_model.u[0:3], self.state.quaternion)
         self.drag_model.u[3:6] = utils.rotate(self.drag_model.u[3:6], self.state.quaternion)
 
-        for x in np.nditer(self.drag_model.u, op_flags=['readwrite']):
-            if math.isnan(x):
-                print 'drag_model contains NaN values: {}'.format(self.drag_model.u)
-                x[...] = 0.0
-            x[...] = utils.minmax(-100.0, x, 100.0)
+        self.drag_model.limit(-100.0, 100.0)
 
         if self.verbose:
             print
             utils.pv('self.__class__.__name__')
-            utils.pv('self.drag_model.u')
         self.drag_model.y = self.f(self.drag_model.u)
         if self.verbose:
-            utils.pv('self.drag_model.y')
+            utils.pv('self.drag_model')
 
         if self.verbose:
             utils.pv('wrench')
-        wrench.force.x -= self.drag_model.y[0]
-        wrench.force.y -= self.drag_model.y[1]
-        wrench.force.z -= self.drag_model.y[2]
-        wrench.torque.x -= self.drag_model.y[3]
-        wrench.torque.y -= self.drag_model.y[4]
-        wrench.torque.z -= self.drag_model.y[5]
+
+        if len(wrench):
+            wrench.force.x += -self.drag_model.y[0]
+            wrench.force.y += self.drag_model.y[1]
+            wrench.force.z += self.drag_model.y[2]
+            wrench.torque.x += -self.drag_model.y[3]
+            wrench.torque.y += self.drag_model.y[4]
+            wrench.torque.z += self.drag_model.y[5]
+        else:
+            wrench.force.x = -self.drag_model.y[0]
+            wrench.force.y = self.drag_model.y[1]
+            wrench.force.z = self.drag_model.y[2]
+            wrench.torque.x = -self.drag_model.y[3]
+            wrench.torque.y = self.drag_model.y[4]
+            wrench.torque.z = self.drag_model.y[5]
+
         if self.verbose:
             utils.pv('wrench')
 

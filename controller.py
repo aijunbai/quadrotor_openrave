@@ -42,17 +42,16 @@ class Controller(printable.Printable):
         if self.verbose:
             print
             utils.pv('self.__class__.__name__')
-            utils.pv('self.input_', 'dt')
+            utils.pv('self.input_', 'self.dt')
 
         if self.command in self.input_:
             self.process()
-            if self.verbose:
-                utils.pv('self.output')
-            return self.output
+        else:
+            self.output = self.input_
 
         if self.verbose:
-            utils.pv('self.input_')
-        return self.input_
+            utils.pv('self.output')
+        return self.output
 
     @abc.abstractmethod
     def process(self):

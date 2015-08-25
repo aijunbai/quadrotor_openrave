@@ -40,8 +40,8 @@ def run(args=None):
     time.sleep(0.1)  # give time for environment to update
     navi = navigation.Navigation(robot, sleep=False, verbose=options.verbose)
     # navi.run()
-    # navi.test_twist()
-    navi.test_traj()
+    navi.test_twist()
+    # navi.test_traj()
 
 
 if __name__ == "__main__":

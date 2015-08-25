@@ -179,7 +179,7 @@ class Navigation(printable.Printable):
         command.twist.linear.x = 0.0
         command.twist.linear.y = 0.0
         command.twist.linear.z = 0.0
-        command.twist.angular.z = 0.1
+        command.twist.angular.z = math.pi
 
         self.test(command)
 
@@ -191,7 +191,7 @@ class Navigation(printable.Printable):
             x = r * math.cos(theta)
             y = r * math.sin(theta)
             z = self.robot_state.position[2] + math.cos(theta + angles.d2r(45.0))
-            yaw = 0
+            yaw = theta
             traj.append(np.r_[x, y, z, 0.0, 0.0, yaw])
 
         h = self.draw_trajectory(traj)
