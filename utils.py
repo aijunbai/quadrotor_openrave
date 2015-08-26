@@ -47,10 +47,10 @@ def pv(*args, **kwargs):
         val = eval(name, frame.f_globals, frame.f_locals)
 
         prefix = kwargs['prefix'] if 'prefix' in kwargs else ''
-        iostream = sys.stdout if 'stdout' in kwargs and kwargs['stdout'] \
-            else sys.stderr
+        iostream = sys.stderr if 'stderr' in kwargs and kwargs['stderr'] \
+            else sys.stdout
 
-        print >> iostream, '%s%s: %s' % (prefix, name, pprint.pformat(val))
+        print >> iostream, '{}{}: {}'.format(prefix, name, pprint.pformat(val))
 
     if 'pause' in kwargs:
         pause()

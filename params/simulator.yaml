@@ -1,4 +1,6 @@
 controller:
+    trajectory:
+        error: 0.1
     pose:
         xy:
             k_p: 2.0
@@ -46,6 +48,7 @@ controller:
             torque_xy: 10.0
             torque_z: 1.0
 aerodynamics:
+    enabled: False
     C_wxy: 0.12
     C_wz: 0.1
     C_mxy: 0.074156208000000

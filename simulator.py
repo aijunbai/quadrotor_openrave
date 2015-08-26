@@ -11,6 +11,7 @@ import time
 import math
 import state
 import utils
+import draw
 import aerodynamics
 
 import openravepy as rave
@@ -67,7 +68,15 @@ class Simulator(printable.Printable):
         self.set_physics_engine(on=False)
         return success, step, max_steps
 
+    def draw(self, command, reset=False):
+        if 'trajectory' in command:
+            draw.draw_trajectory(self.state.env, command.trajectory, reset=reset)
+        elif 'pose' in command:
+            draw.draw_pose(self.state.env, command.pose, reset=reset)
+
     def simulate(self, command, max_steps):
+        self.draw(command, reset=True)
+
         for step in xrange(max_steps):
             start = time.time()
             if self.verbose:
@@ -75,9 +84,10 @@ class Simulator(printable.Printable):
 
             pipeline = utils.makehash()
             pipeline[0] = command
-            self.state.update()
+            self.state.update(step)
             for i, c in enumerate(self.controllers):
                 pipeline[i + 1] = c.update(pipeline[i], self.dt)
+                self.draw(pipeline[i + 1], reset=False)
 
             wrench = self.aerodynamics.apply(pipeline[len(self.controllers)].wrench, self.dt)
             status = self.state.apply(wrench, self.dt)

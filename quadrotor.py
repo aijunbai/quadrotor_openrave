@@ -7,6 +7,7 @@ from __future__ import with_statement  # for python 2.5
 import os
 import time
 import navigation
+import test
 import openravepy as rave
 import numpy as np
 
@@ -39,10 +40,9 @@ def run(args=None):
 
     time.sleep(0.1)  # give time for environment to update
     navi = navigation.Navigation(robot, sleep=False, verbose=options.verbose)
+    # navi.test(test.twist, 10000)
+    # navi.test(test.circle, 10000)
     # navi.run()
-    navi.test_twist()
-    # navi.test_traj()
-
 
 if __name__ == "__main__":
     os.environ['TRAJOPT_LOG_THRESH'] = 'WARN'

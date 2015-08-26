@@ -18,13 +18,16 @@ class State(printable.Printable):
         super(State, self).__init__()
 
         self.verbose = verbose
+        self.step = 0
         self.env = env
         self.robot = env.GetRobots()[0]
         self.physics_engine = env.GetPhysicsEngine()
         self.base_link = self.robot.GetLink('base_link')
 
     @memoized.reset()
-    def update(self):
+    def update(self, step):
+        self.step = step
+
         if self.verbose:
             print
             utils.pv('self.__class__.__name__')
@@ -166,9 +169,9 @@ class State(printable.Printable):
 
         with self.env:
             self.env.StepSimulation(dt)
+            self.env.UpdatePublishedBodies()
 
         return ret
 
     def valid(self):
         return self.load_factor >= 0.0 and self.position[2] >= 0.0
-

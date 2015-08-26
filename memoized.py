@@ -47,10 +47,7 @@ class memoized(object):
 
         return memoized.memo[obj][fn][key]
 
-    def __get__(self, obj, cls):
-        if obj is None:
-            return self.f
-
+    def __get__(self, obj, objtype):
         return functools.partial(self.__call__, obj)
 
     @staticmethod

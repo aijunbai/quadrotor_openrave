@@ -11,6 +11,7 @@ import printable
 import addict
 import angles
 import abc
+import draw
 import numpy as np
 import openravepy as rave
 from tf import transformations
@@ -41,8 +42,9 @@ class Controller(printable.Printable):
 
         if self.verbose:
             print
-            utils.pv('self.__class__.__name__')
-            utils.pv('self.input_', 'self.dt')
+            utils.pv('self.__class__.__name__', 'self.dt')
+            if self.command != 'trajectory':
+                utils.pv('self.input_')
 
         if self.command in self.input_:
             self.process()
@@ -93,6 +95,7 @@ class TwistController(Controller):
         twist_body.linear = self.state.to_body(self.state.twist.linear)
         twist_body.angular = self.state.to_body(self.state.twist.angular)
         load_factor = utils.bound(self.state.load_factor, self.load_factor_limit)
+
         acceleration_command = np.array([0.0, 0.0, 0.0])
         acceleration_command[0] = self.pid.linear.x.update(
             self.input_.twist.linear.x, self.state.twist.linear[0], self.state.acceleration[0], self.dt)
@@ -102,18 +105,24 @@ class TwistController(Controller):
             self.input_.twist.linear.z, self.state.twist.linear[2], self.state.acceleration[2],
             self.dt) + self.state.gravity
         acceleration_command_body = self.state.to_body(acceleration_command)
+
         if self.verbose:
-            utils.pv('twist_body', 'load_factor', 'acceleration_command', 'acceleration_command_body')
+            utils.pv(
+                'twist_body', 'self.state.load_factor', 'load_factor',
+                'acceleration_command', 'acceleration_command_body')
+
         self.output.wrench.torque.x = self.state.inertia[0] * self.pid.angular.x.update(
             -acceleration_command_body[1] / self.state.gravity, 0.0, twist_body.angular[0], self.dt)
         self.output.wrench.torque.y = self.state.inertia[1] * self.pid.angular.y.update(
             acceleration_command_body[0] / self.state.gravity, 0.0, twist_body.angular[1], self.dt)
         self.output.wrench.torque.z = self.state.inertia[2] * self.pid.angular.z.update(
             self.input_.twist.angular.z, self.state.twist.angular[2], 0.0, self.dt)
+
         self.output.wrench.force.x = 0.0
         self.output.wrench.force.y = 0.0
         self.output.wrench.force.z = self.state.mass * (
             (acceleration_command[2] - self.state.gravity) * load_factor + self.state.gravity)
+
         self.output.wrench.force.z = utils.bound(self.output.wrench.force.z, self.force_z_limit)
         self.output.wrench.force.z = max(self.output.wrench.force.z, 0.0)
         self.output.wrench.torque.x = utils.bound(self.output.wrench.torque.x, self.torque_xy_limit)
@@ -151,7 +160,7 @@ class TrajectoryController(Controller):
         super(TrajectoryController, self).__init__(state, verbose=verbose)
 
         self.traj_idx = 0
-        self.error = 0.1
+        self.error = params('error', 0.1)
         self.command = 'trajectory'
 
     def reset(self):
@@ -159,13 +168,15 @@ class TrajectoryController(Controller):
         self.traj_idx = 0
 
     def process(self):
-        if self.traj_idx < len(self.input_.trajectory):
-            self.output.pose = self.input_.trajectory[self.traj_idx]
+        self.output.pose = self.input_.trajectory[self.traj_idx]
 
-            if utils.dist(
-                    np.r_[self.state.position, self.state.euler[2]],
-                    np.r_[self.output.pose.x, self.output.pose.y,
-                          self.output.pose.z, self.output.pose.yaw]) < self.error:
+        # if self.state.step > 800:
+        #     return
+
+        while utils.dist(
+                np.r_[self.state.position, self.state.euler[2]],
+                np.r_[self.output.pose.x, self.output.pose.y,
+                      self.output.pose.z, self.output.pose.yaw]) < self.error:
+            if self.traj_idx < len(self.input_.trajectory) - 1:
                 self.traj_idx += 1
-                if self.traj_idx < len(self.input_.trajectory):
-                    self.output.pose = self.input_.trajectory[self.traj_idx]
+                self.output.pose = self.input_.trajectory[self.traj_idx]
