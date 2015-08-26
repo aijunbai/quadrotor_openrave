@@ -25,6 +25,7 @@ class Simulator(printable.Printable):
         super(Simulator, self).__init__()
 
         self.env = env
+        self.robot = env.GetRobots()[0]
         self.set_physics_engine(on=False)
 
         self.state = state
@@ -89,9 +90,11 @@ class Simulator(printable.Printable):
                 pipeline[i + 1] = c.update(pipeline[i], self.dt)
                 self.draw(pipeline[i + 1], reset=False)
 
-            wrench = self.aerodynamics.apply(pipeline[len(self.controllers)].wrench, self.dt)
-            status = self.state.apply(wrench, self.dt)
-            if not status or not self.state.valid():
+            self.state.apply(
+                self.aerodynamics.apply(pipeline[len(self.controllers)].wrench, self.dt), self.dt)
+            finished = self.controllers[0].finished()
+
+            if finished or not self.state.valid():
                 if not self.state.valid():
                     utils.pv('self.state.load_factor')
                     utils.pv('self.state.position')

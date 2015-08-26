@@ -25,12 +25,12 @@ from trajoptpy import check_traj
 
 
 class Navigation(printable.Printable):
-    def __init__(self, robot, sleep=False, verbose=False):
+    def __init__(self, env, sleep=False, verbose=False):
         super(Navigation, self).__init__()
 
         self.verbose = verbose
-        self.env = robot.GetEnv()
-        self.robot = robot
+        self.env = env
+        self.robot = env.GetRobots()[0]
         self.robot_state = state.State(self.env, verbose=self.verbose)
         self.params = parser.Yaml(file_name='params/simulator.yaml')
 
@@ -121,7 +121,6 @@ class Navigation(printable.Printable):
         if physics:
             self.simulator.follow(traj)
         else:
-            draw.draw_trajectory(self.env, traj, reset=True)
             for (i, row) in enumerate(traj):
                 self.robot.SetActiveDOFValues(row)
                 time.sleep(0.1)
@@ -136,13 +135,15 @@ class Navigation(printable.Printable):
                     break
         return goal
 
-    def test(self, command_func, max_steps=10000):
+    def test(self, command_func, test_count=1, max_steps=10000):
+        utils.pv('command_func', 'test_count', 'max_steps')
         experiments, success, progress = 0, 0, 0.0
 
-        for _ in range(10):
+        for _ in range(test_count):
             experiments += 1
             command = command_func()
-            ret = self.simulator.run(command, max_steps=max_steps)
+            with self.robot:
+                ret = self.simulator.run(command, max_steps=max_steps)
             success += ret[0]
             progress = (progress * (experiments - 1) + ret[1] / ret[2]) / experiments
             utils.pv('experiments', 'success', 'success/experiments', 'progress')
@@ -154,13 +155,14 @@ class Navigation(printable.Printable):
             goal = self.collision_free(self.random_goal)
             draw.draw_pose(self.env, goal, reset=True)
 
-            traj, total_cost = self.plan(start_pose, goal, multi_initialization=100)
+            with self.robot:
+                traj, total_cost = self.plan(start_pose, goal, multi_initialization=100)
             if traj is not None:
-                draw.draw_trajectory(self.env, traj)
+                draw.draw_trajectory(self.env, traj, reset=True)
                 if self.verbose:
                     utils.pv('traj')
                     utils.pv('total_cost')
-                self.execute_trajectory(traj, physics=False)
+                self.execute_trajectory(traj, physics=True)
 
             time.sleep(1)
 
@@ -183,9 +185,10 @@ class Navigation(printable.Printable):
             inittraj[:waypoint_step+1] = mu.linspace2d(start_pose, waypoint, waypoint_step+1)
             inittraj[waypoint_step:] = mu.linspace2d(waypoint, goal, n_steps - waypoint_step)
 
-            self.robot.SetActiveDOFValues(start_pose)
-            request = self.make_fullbody_request(goal, inittraj, n_steps)
-            prob = trajoptpy.ConstructProblem(json.dumps(request), self.env)
+            with self.robot:
+                self.robot.SetActiveDOFValues(start_pose)
+                request = self.make_fullbody_request(goal, inittraj, n_steps)
+                prob = trajoptpy.ConstructProblem(json.dumps(request), self.env)
 
             def constraint(dofs):
                 valid = True

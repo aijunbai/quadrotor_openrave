@@ -146,8 +146,6 @@ class State(printable.Printable):
         return utils.rotate(v, self.quaternion)
 
     def apply(self, wrench, dt):
-        ret = False
-
         if 'force' in wrench and 'torque' in wrench:
             g_com = self.center_of_mass
             l_com = self.to_body(g_com - self.position)
@@ -165,13 +163,10 @@ class State(printable.Printable):
             with self.env:
                 self.base_link.SetForce(self.from_body(force), g_com, True)
                 self.base_link.SetTorque(self.from_body(torque), True)
-                ret = True
 
         with self.env:
             self.env.StepSimulation(dt)
             self.env.UpdatePublishedBodies()
-
-        return ret
 
     def valid(self):
         return self.load_factor >= 0.0 and self.position[2] >= 0.0

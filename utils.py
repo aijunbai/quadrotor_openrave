@@ -68,7 +68,7 @@ def dist(a, b):
 
 
 def flatten(x):
-    return [y for l in x for y in flatten(l)] if type(x) is list else [x]
+    return [y for l in x for y in flatten(l)] if isinstance(x, list) else [x]
 
 
 def forward(*args):

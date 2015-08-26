@@ -4,11 +4,13 @@ source "conf/config.sh"
 
 PROFILE="False"
 VERBOSE="False"
+TEST="False"
 
-while getopts "pv" opt; do
+while getopts "pvt" opt; do
     case "$opt" in
         p) PROFILE="True";;
         v) VERBOSE="True";;
+        t) TEST="True";;
         *) ;;
     esac
 done
@@ -24,6 +26,10 @@ profile() {
 
 if [ $VERBOSE = "True" ]; then
     QUADROTOR="$QUADROTOR --verbose"
+fi
+
+if [ $TEST = "True" ]; then
+    QUADROTOR="$QUADROTOR --test"
 fi
 
 if [ $PROFILE = "True" ]; then

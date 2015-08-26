@@ -59,6 +59,10 @@ class Controller(printable.Printable):
     def process(self):
         pass
 
+    @abc.abstractmethod
+    def finished(self):
+        pass
+
     def reset(self):
         Controller.reset_tree(self.pid)
 
@@ -67,7 +71,7 @@ class Controller(printable.Printable):
 
     @staticmethod
     def reset_tree(t):
-        if type(t) == addict.Dict:
+        if isinstance(t, addict.Dict):
             for k, v in t.items():
                 Controller.reset_tree(v)
         else:
@@ -89,6 +93,9 @@ class TwistController(Controller):
         self.torque_xy_limit = params.limits('torque_xy', -1.0)
         self.torque_z_limit = params.limits('torque_z', -1.0)
         self.command = 'twist'
+
+    def finished(self):
+        return False
 
     def process(self):
         twist_body = addict.Dict()
@@ -140,6 +147,9 @@ class PoseController(Controller):
         self.pid.yaw = pid.PIDController(params.yaw)
         self.command = 'pose'
 
+    def finished(self):
+        return False
+
     def process(self):
         self.output.twist.linear.x = self.pid.x.update(
             self.input_.pose.x, self.state.position[0], self.state.twist.linear[0], self.dt)
@@ -167,16 +177,18 @@ class TrajectoryController(Controller):
         super(TrajectoryController, self).reset()
         self.traj_idx = 0
 
+    def finished(self):
+        return self.traj_idx >= len(self.input_.trajectory) - 1
+
     def process(self):
         self.output.pose = self.input_.trajectory[self.traj_idx]
-
-        # if self.state.step > 800:
-        #     return
 
         while utils.dist(
                 np.r_[self.state.position, self.state.euler[2]],
                 np.r_[self.output.pose.x, self.output.pose.y,
-                      self.output.pose.z, self.output.pose.yaw]) < self.error:
-            if self.traj_idx < len(self.input_.trajectory) - 1:
+                      self.output.pose.z, self.output.pose.yaw]) < self.error and \
+                self.traj_idx < len(self.input_.trajectory) - 1:
                 self.traj_idx += 1
                 self.output.pose = self.input_.trajectory[self.traj_idx]
+
+
