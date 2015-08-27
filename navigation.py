@@ -16,7 +16,7 @@ import planner
 
 
 class Navigation(printable.Printable):
-    def __init__(self, robot, sleep=False, verbose=False):
+    def __init__(self, robot, mp, sleep=False, verbose=False):
         super(Navigation, self).__init__()
 
         self.verbose = verbose
@@ -25,10 +25,7 @@ class Navigation(printable.Printable):
         self.robot_state = state.State(self.env, verbose=self.verbose)
         self.params = parser.Yaml(file_name='params/simulator.yaml')
 
-        # self.planner = planner.TrajoptPlanner(
-        #     self.robot, params=addict.Dict(multi_initialization=10, n_steps=30), verbose=self.verbose)
-        self.planner = planner.RRTPlanner(
-            self.robot, params=addict.Dict(maxiter=3000, steplength=0.1, n_steps=30))
+        self.planner = planner.find(mp)(self.robot, self.verbose)
         self.simulator = simulator.Simulator(
             self.robot, self.robot_state, self.params, sleep=sleep, verbose=self.verbose)
 

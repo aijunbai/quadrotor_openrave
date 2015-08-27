@@ -5,6 +5,7 @@ from __future__ import with_statement  # for python 2.5
 
 import abc
 import json
+import addict
 import numpy as np
 import openravepy as rave
 
@@ -55,6 +56,11 @@ class Planner(object):
     def plan(self, start, goal):
         pass
 
+    @staticmethod
+    @abc.abstractmethod
+    def create(robot, verbose):
+        pass
+
     def collision_free(self, method):
         pose = None
         with self.robot:
@@ -72,6 +78,13 @@ class Planner(object):
 class TrajoptPlanner(Planner):
     def __init__(self, robot, params=None, verbose=False):
         super(TrajoptPlanner, self).__init__(robot, params=params, verbose=verbose)
+
+    @staticmethod
+    def create(robot, verbose):
+        return TrajoptPlanner(
+            robot,
+            params=addict.Dict(multi_initialization=10, n_steps=30),
+            verbose=verbose)
 
     @staticmethod
     def make_fullbody_request(end_joints, inittraj, n_steps):
@@ -138,13 +151,13 @@ class TrajoptPlanner(Planner):
         for i, waypoint in enumerate(waypoints):
             if self.verbose:
                 utils.pv('i', 'waypoint')
-            inittraj = np.empty((n_steps, 6))
+            inittraj = np.empty((self.params.n_steps, 6))
             inittraj[:waypoint_step + 1] = mu.linspace2d(start, waypoint, waypoint_step + 1)
-            inittraj[waypoint_step:] = mu.linspace2d(waypoint, goal, n_steps - waypoint_step)
+            inittraj[waypoint_step:] = mu.linspace2d(waypoint, goal, self.params.n_steps - waypoint_step)
 
             with self.robot:
                 self.robot.SetActiveDOFValues(start)
-                request = self.make_fullbody_request(goal, inittraj, n_steps)
+                request = self.make_fullbody_request(goal, inittraj, self.params.n_steps)
                 prob = trajoptpy.ConstructProblem(json.dumps(request), self.env)
 
             def constraint(dofs):
@@ -156,7 +169,7 @@ class TrajoptPlanner(Planner):
                     valid &= not self.env.CheckCollision(self.robot)
                 return 0 if valid else 1
 
-            for t in range(1, n_steps):
+            for t in range(1, self.params.n_steps):
                 prob.AddConstraint(
                     constraint, [(t, j) for j in range(6)], "EQ", "constraint%i" % t)
 
@@ -182,6 +195,13 @@ class RRTPlanner(Planner):
     def __init__(self, robot, params=None, verbose=False):
         super(RRTPlanner, self).__init__(robot, params=params, verbose=verbose)
         self.basemanip = rave.interfaces.BaseManipulation(self.robot)
+
+    @staticmethod
+    def create(robot, verbose):
+        return RRTPlanner(
+            robot,
+            params=addict.Dict(maxiter=3000, steplength=0.1, n_steps=30),
+            verbose=verbose)
 
     def plan(self, start, goal):
         with self.robot:
@@ -209,3 +229,10 @@ class RRTPlanner(Planner):
                 return traj, traj_obj.GetDuration()
 
         return None, None
+
+
+def find(name, planners=addict.Dict()):
+    if len(planners) == 0:
+        planners.trajopt = TrajoptPlanner.create
+        planners.rrt = RRTPlanner.create
+    return planners[name]

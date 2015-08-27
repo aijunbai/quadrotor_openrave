@@ -15,17 +15,18 @@ __author__ = 'Aijun Bai'
 
 
 from optparse import OptionParser
-from openravepy.misc import OpenRAVEGlobalArguments
 
 
 @rave.with_destroy
 def run(args=None):
-    parser = OptionParser(description='Navigation planning using trajopt.')
-    OpenRAVEGlobalArguments.addOptions(parser)
+    parser = OptionParser(description='Quadrotor')
 
     parser.add_option('--scene',
                       action='store', type='string', dest='scene', default='data/quadrotor.env.xml',
                       help='Scene file to load (default=%default)')
+    parser.add_option('--mp',
+                      action='store', type='string', dest='mp', default='rrt',
+                      help='Motion planner to use (default=%default)')
     parser.add_option('--verbose',
                       action='store_true', dest='verbose', default=False,
                       help='Set verbose output')
@@ -43,7 +44,8 @@ def run(args=None):
         robot = env.GetRobots()[0]
 
         time.sleep(0.1)  # give time for environment to update
-        navi = navigation.Navigation(robot, sleep=False, verbose=options.verbose)
+        navi = navigation.Navigation(
+            robot, options.mp, sleep=False, verbose=options.verbose)
 
         if options.test:
             test.test(navi)
