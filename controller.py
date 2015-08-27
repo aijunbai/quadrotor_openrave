@@ -43,10 +43,9 @@ class Controller(printable.Printable):
         if self.verbose:
             print
             utils.pv('self.__class__.__name__', 'self.dt')
-            if self.command != 'trajectory':
-                utils.pv('self.input_')
+            utils.pv('self.input_')
 
-        if self.command in self.input_:
+        if self.command in self.input_ and self.input_[self.command]:
             self.process()
         else:
             self.output = self.input_
@@ -171,6 +170,7 @@ class TrajectoryController(Controller):
 
         self.traj_idx = 0
         self.error = params('error', 0.1)
+        self.yaw_control = params('yaw_control', False)
         self.command = 'trajectory'
 
     def reset(self):
@@ -178,17 +178,30 @@ class TrajectoryController(Controller):
         self.traj_idx = 0
 
     def finished(self):
-        return self.traj_idx >= len(self.input_.trajectory) - 1
+        return len(self.input_.trajectory) and \
+            self.traj_idx >= len(self.input_.trajectory) - 1
+
+    def pose(self):
+        if self.yaw_control or self.finished():
+            return self.input_.trajectory[self.traj_idx]
+        else:
+            pose_ = copy.deepcopy(self.input_.trajectory[self.traj_idx])
+            pose_.yaw = self.state.euler[2]
+            return pose_
+
+    def np_pose(self):
+        pose_ = self.pose()
+        return np.r_[pose_.x, pose_.y, pose_.z, pose_.yaw]
 
     def process(self):
-        self.output.pose = self.input_.trajectory[self.traj_idx]
+        if len(self.input_.trajectory):
+            self.output.pose = self.pose()
 
-        while utils.dist(
-                np.r_[self.state.position, self.state.euler[2]],
-                np.r_[self.output.pose.x, self.output.pose.y,
-                      self.output.pose.z, self.output.pose.yaw]) < self.error and \
-                self.traj_idx < len(self.input_.trajectory) - 1:
-                self.traj_idx += 1
-                self.output.pose = self.input_.trajectory[self.traj_idx]
-
+            while utils.dist(
+                    np.r_[self.state.position, self.state.euler[2]], self.np_pose()) < \
+                    self.error and \
+                    self.traj_idx < len(self.input_.trajectory) - 1:
+                    self.traj_idx += 1
+                    self.output.pose = self.pose()
+                    draw.draw_pose(self.state.env, self.output.pose)
 

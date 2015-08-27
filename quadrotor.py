@@ -35,18 +35,22 @@ def run(args=None):
 
     (options, leftargs) = parser.parse_args(args=args)
 
-    env = rave.Environment()
-    env.SetViewer('qtcoin')
-    env.Load(options.scene)
-    env.UpdatePublishedBodies()
+    try:
+        env = rave.Environment()
+        env.SetViewer('qtcoin')
+        env.Load(options.scene)
+        env.UpdatePublishedBodies()
+        robot = env.GetRobots()[0]
 
-    time.sleep(0.1)  # give time for environment to update
-    navi = navigation.Navigation(env, sleep=False, verbose=options.verbose)
+        time.sleep(0.1)  # give time for environment to update
+        navi = navigation.Navigation(robot, sleep=False, verbose=options.verbose)
 
-    if options.test:
-        test.test(navi)
-    else:
-        navi.run()
+        if options.test:
+            test.test(navi)
+        else:
+            navi.run()
+    finally:
+        env.Destroy()
 
 if __name__ == "__main__":
     os.environ['TRAJOPT_LOG_THRESH'] = 'WARN'

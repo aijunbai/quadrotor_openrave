@@ -21,14 +21,14 @@ __author__ = 'Aijun Bai'
 
 
 class Simulator(printable.Printable):
-    def __init__(self, env, state, params, sleep=False, verbose=False):
+    def __init__(self, robot, state_, params, sleep=False, verbose=False):
         super(Simulator, self).__init__()
 
-        self.env = env
-        self.robot = env.GetRobots()[0]
+        self.robot = robot
+        self.env = self.robot.GetEnv()
         self.set_physics_engine(on=False)
 
-        self.state = state
+        self.state = state_
         self.verbose = verbose
         self.sleep = sleep
         self.dt = params('timestep', 0.001)
@@ -69,14 +69,9 @@ class Simulator(printable.Printable):
         self.set_physics_engine(on=False)
         return success, step, max_steps
 
-    def draw(self, command, reset=False):
-        if 'trajectory' in command:
-            draw.draw_trajectory(self.state.env, command.trajectory, reset=reset)
-        elif 'pose' in command:
-            draw.draw_pose(self.state.env, command.pose, reset=reset)
-
     def simulate(self, command, max_steps):
-        self.draw(command, reset=True)
+        if 'trajectory' in command:
+            draw.draw_trajectory(self.state.env, command.trajectory, reset=True)
 
         for step in xrange(max_steps):
             start = time.time()
@@ -88,10 +83,10 @@ class Simulator(printable.Printable):
             self.state.update(step)
             for i, c in enumerate(self.controllers):
                 pipeline[i + 1] = c.update(pipeline[i], self.dt)
-                self.draw(pipeline[i + 1], reset=False)
 
             self.state.apply(
-                self.aerodynamics.apply(pipeline[len(self.controllers)].wrench, self.dt), self.dt)
+                self.aerodynamics.apply(
+                    pipeline[len(self.controllers)].wrench, self.dt), self.dt)
             finished = self.controllers[0].finished()
 
             if finished or not self.state.valid():

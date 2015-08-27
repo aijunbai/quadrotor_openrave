@@ -17,6 +17,7 @@ import state
 import angles
 import test
 import draw
+import planner
 import openravepy as rave
 import numpy as np
 import trajoptpy.math_utils as mu
@@ -25,97 +26,21 @@ from trajoptpy import check_traj
 
 
 class Navigation(printable.Printable):
-    def __init__(self, env, sleep=False, verbose=False):
+    def __init__(self, robot, sleep=False, verbose=False):
         super(Navigation, self).__init__()
 
         self.verbose = verbose
-        self.env = env
-        self.robot = env.GetRobots()[0]
+        self.robot = robot
+        self.env = self.robot.GetEnv()
         self.robot_state = state.State(self.env, verbose=self.verbose)
         self.params = parser.Yaml(file_name='params/simulator.yaml')
 
+        # self.planner = planner.TrajoptPlanner(
+        #     self.robot, params=addict.Dict(multi_initialization=10, n_steps=30), verbose=self.verbose)
+        self.planner = planner.RRTPlanner(
+            self.robot, params=addict.Dict(maxiter=3000, steplength=0.1, n_steps=30))
         self.simulator = simulator.Simulator(
-            self.env, self.robot_state, self.params, sleep=sleep, verbose=self.verbose)
-
-        with self.env:
-            envmin, envmax = [], []
-            for b in self.env.GetBodies():
-                ab = b.ComputeAABB()
-                envmin.append(ab.pos() - ab.extents())
-                envmax.append(ab.pos() + ab.extents())
-            abrobot = self.robot.ComputeAABB()
-            envmin = np.min(np.array(envmin), 0.0) + abrobot.extents()
-            envmax = np.max(np.array(envmax), 0.0) - abrobot.extents()
-            envmin -= np.ones_like(envmin)
-            envmax += np.ones_like(envmax)
-            envmin[2] = max(envmin[2], 0.0)
-
-            self.bounds = np.array(((envmin[0], envmin[1], envmin[2], 0.0, 0.0, -np.pi),
-                                    (envmax[0], envmax[1], envmax[2], 0.0, 0.0, np.pi)))
-
-            self.robot.SetAffineTranslationLimits(envmin, envmax)
-            self.robot.SetAffineTranslationMaxVels([0.5, 0.5, 0.5, 0.5])
-            self.robot.SetAffineRotationAxisMaxVels(np.ones(4))
-
-            self.robot.SetActiveDOFs(
-                [], rave.DOFAffine.X | rave.DOFAffine.Y | rave.DOFAffine.Z | rave.DOFAffine.Rotation3D)
-
-    def random_goal(self):
-        return self.bounds[0, :] + np.random.rand(6) * (self.bounds[1, :] - self.bounds[0, :])
-
-    @staticmethod
-    def make_fullbody_request(end_joints, inittraj, n_steps):
-        if isinstance(end_joints, np.ndarray):
-            end_joints = end_joints.tolist()
-
-        coll_coeff = 150
-        dist_pen = 0.05
-
-        d = {
-            "basic_info": {
-                "n_steps": n_steps,
-                "manip": "active",
-                "start_fixed": True
-            },
-            "costs": [
-                {
-                    "type": "joint_vel",
-                    "params": {
-                        "coeffs": [5]
-                    }
-                },
-                {
-                    "name": "cont_coll",
-                    "type": "collision",
-                    "params": {
-                        "coeffs": [coll_coeff],
-                        "dist_pen": [dist_pen],
-                        "continuous": True
-                    }
-                },
-                {
-                    "name": "disc_coll",
-                    "type": "collision",
-                    "params": {
-                        "coeffs": [coll_coeff],
-                        "dist_pen": [dist_pen],
-                        "continuous": False
-                    }
-                }
-            ],
-            "constraints": [
-                {"type": "joint", "params": {
-                    "vals": end_joints
-                    }
-                }
-            ],
-            "init_info": {
-                "type": "given_traj",
-                "data": [row.tolist() for row in inittraj]
-            }
-        }
-
-        return d
+            self.robot, self.robot_state, self.params, sleep=sleep, verbose=self.verbose)
 
     def execute_trajectory(self, traj, physics=False):
         if physics:
@@ -123,17 +48,9 @@ class Navigation(printable.Printable):
         else:
             for (i, row) in enumerate(traj):
                 self.robot.SetActiveDOFValues(row)
+                draw.draw_pose(self.env, row)
                 time.sleep(0.1)
-
-    def collision_free(self, method):
-        goal = None
-        with self.robot:
-            while True:
-                goal = method()
-                self.robot.SetActiveDOFValues(goal)
-                if not self.env.CheckCollision(self.robot):
-                    break
-        return goal
+        self.robot.SetActiveDOFValues(traj[-1])
 
     def test(self, command_func, test_count=1, max_steps=10000):
         utils.pv('command_func', 'test_count', 'max_steps')
@@ -151,12 +68,14 @@ class Navigation(printable.Printable):
 
     def run(self):
         while True:
-            start_pose = self.robot.GetActiveDOFValues()
-            goal = self.collision_free(self.random_goal)
+            start = self.robot.GetActiveDOFValues()
+            goal = self.planner.collision_free(self.planner.random_goal)
             draw.draw_pose(self.env, goal, reset=True)
 
             with self.robot:
-                traj, total_cost = self.plan(start_pose, goal, multi_initialization=100)
+                if self.verbose:
+                    print 'planning to: {}'.format(goal)
+                traj, total_cost = self.planner.plan(start, goal)
             if traj is not None:
                 draw.draw_trajectory(self.env, traj, reset=True)
                 if self.verbose:
@@ -165,63 +84,3 @@ class Navigation(printable.Printable):
                 self.execute_trajectory(traj, physics=True)
 
             time.sleep(1)
-
-    def plan(self, start_pose, goal, multi_initialization=1):
-        if self.verbose:
-            print 'planning to: {}'.format(goal)
-
-        n_steps = 30
-        waypoint_step = (n_steps - 1) // 2
-        waypoints = [(np.r_[start_pose] + np.r_[goal]) / 2]
-        solutions = []
-
-        for _ in range(multi_initialization - 1):
-            waypoints.append(self.collision_free(self.random_goal))
-
-        for i, waypoint in enumerate(waypoints):
-            if self.verbose:
-                utils.pv('i', 'waypoint')
-            inittraj = np.empty((n_steps, 6))
-            inittraj[:waypoint_step+1] = mu.linspace2d(start_pose, waypoint, waypoint_step+1)
-            inittraj[waypoint_step:] = mu.linspace2d(waypoint, goal, n_steps - waypoint_step)
-
-            with self.robot:
-                self.robot.SetActiveDOFValues(start_pose)
-                request = self.make_fullbody_request(goal, inittraj, n_steps)
-                prob = trajoptpy.ConstructProblem(json.dumps(request), self.env)
-
-            def constraint(dofs):
-                valid = True
-                valid &= abs(dofs[3]) < 0.1
-                valid &= abs(dofs[4]) < 0.1
-                with self.robot:
-                    self.robot.SetActiveDOFValues(dofs)
-                    valid &= not self.env.CheckCollision(self.robot)
-                return 0 if valid else 1
-
-            for t in range(1, n_steps):
-                prob.AddConstraint(
-                    constraint, [(t, j) for j in range(6)], "EQ", "constraint%i" % t)
-
-            result = trajoptpy.OptimizeProblem(prob)
-            traj = result.GetTraj()
-            prob.SetRobotActiveDOFs()
-            total_cost = sum(cost[1] for cost in result.GetCosts())
-            draw.draw_trajectory(self.env, traj)
-
-            if traj is not None and len(traj):
-                collision = not check_traj.traj_is_safe(traj, self.robot)
-                if not collision:
-                    if self.verbose:
-                        print "trajectory is safe! :)"
-                    solutions.append((traj, total_cost))
-                    if i == 0:
-                        break
-                else:
-                    if self.verbose:
-                        print "trajectory contains a collision :("
-
-        if len(solutions):
-            return sorted(solutions, key=lambda x: x[1])[0]
-
-        return None, None
