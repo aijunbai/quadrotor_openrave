@@ -5,24 +5,14 @@ from __future__ import division
 __author__ = 'Aijun Bai'
 
 import time
-import json
 import utils
-import trajoptpy
 import simulator
 import printable
 import addict
-import math
 import parser
 import state
-import angles
-import test
 import draw
 import planner
-import openravepy as rave
-import numpy as np
-import trajoptpy.math_utils as mu
-
-from trajoptpy import check_traj
 
 
 class Navigation(printable.Printable):

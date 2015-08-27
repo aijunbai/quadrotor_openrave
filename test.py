@@ -3,11 +3,11 @@
 from __future__ import division
 from __future__ import with_statement  # for python 2.5
 
+import numpy as np
+
 import addict
 import math
 import angles
-import numpy as np
-
 
 __author__ = 'Aijun Bai'
 

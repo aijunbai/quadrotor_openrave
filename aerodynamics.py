@@ -7,15 +7,9 @@ __author__ = 'Aijun Bai'
 
 import utils
 import math
-import random
-import copy
-import pid
 import printable
 import addict
-import angles
 import numpy as np
-import openravepy as rave
-from tf import transformations
 
 
 class DragModel(printable.Printable):

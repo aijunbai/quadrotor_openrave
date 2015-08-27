@@ -6,10 +6,10 @@ from __future__ import with_statement  # for python 2.5
 
 import os
 import time
+import openravepy as rave
+
 import navigation
 import test
-import openravepy as rave
-import numpy as np
 
 __author__ = 'Aijun Bai'
 

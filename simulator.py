@@ -3,19 +3,16 @@
 from __future__ import division
 from __future__ import with_statement  # for python 2.5
 
-import parser
+import time
+import openravepy as rave
+import numpy as np
+
 import printable
 import controller
 import addict
-import time
-import math
-import state
 import utils
 import draw
 import aerodynamics
-
-import openravepy as rave
-import numpy as np
 
 __author__ = 'Aijun Bai'
 

@@ -7,7 +7,6 @@ import utils
 import printable
 import math
 import addict
-import numpy as np
 
 __author__ = 'Aijun Bai'
 

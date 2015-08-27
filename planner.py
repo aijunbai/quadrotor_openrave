@@ -5,15 +5,16 @@ from __future__ import with_statement  # for python 2.5
 
 import abc
 import json
-import trajoptpy
-import utils
-import draw
 import numpy as np
 import openravepy as rave
+
+import trajoptpy
 import trajoptpy.math_utils as mu
 from trajoptpy import check_traj
 from tf import transformations
 
+import utils
+import draw
 
 __author__ = 'Aijun Bai'
 

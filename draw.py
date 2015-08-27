@@ -3,10 +3,10 @@
 from __future__ import division
 from __future__ import with_statement  # for python 2.5
 
-import addict
 import copy
 import numpy as np
 
+import addict
 
 __author__ = 'Aijun Bai'
 

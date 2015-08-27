@@ -2,20 +2,17 @@
 
 from __future__ import division
 
+import copy
+import abc
+import numpy as np
+
 import utils
 import math
-import random
-import copy
 import pid
 import printable
 import addict
 import angles
-import abc
 import draw
-import numpy as np
-import openravepy as rave
-from tf import transformations
-from memoized import memoized
 
 __author__ = 'Aijun Bai'
 

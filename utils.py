@@ -7,10 +7,9 @@ import inspect
 import pprint
 import sys
 import numpy as np
-
 from collections import defaultdict
-from tf import transformations
 
+from tf import transformations
 
 __author__ = "Aijun Bai"
 __copyright__ = "Copyright 2015, UC Berkeley."

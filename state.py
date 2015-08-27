@@ -3,12 +3,14 @@
 from __future__ import division
 from __future__ import with_statement  # for python 2.5
 
+import numpy as np
+
+from tf import transformations
+
 import printable
 import addict
 import utils
-import numpy as np
 from memoized import memoized
-from tf import transformations
 
 __author__ = 'Aijun Bai'
 
