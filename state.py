@@ -17,9 +17,8 @@ __author__ = 'Aijun Bai'
 
 class State(printable.Printable):
     def __init__(self, env, verbose=False):
-        super(State, self).__init__()
+        super(State, self).__init__(verbose)
 
-        self.verbose = verbose
         self.step = 0
         self.env = env
         self.robot = env.GetRobots()[0]

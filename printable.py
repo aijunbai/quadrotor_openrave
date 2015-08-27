@@ -10,8 +10,8 @@ __author__ = 'Aijun Bai'
 
 
 class Printable(object):
-    def __init__(self):
-        pass
+    def __init__(self, verbose):
+        self.verbose = verbose
 
     def __str__(self):
         return pprint.pformat(vars(self))

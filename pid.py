@@ -15,9 +15,8 @@ class PIDController(printable.Printable):
     nan = float('nan')
 
     def __init__(self, params, verbose=False):
-        super(PIDController, self).__init__()
+        super(PIDController, self).__init__(verbose)
 
-        self.verbose = verbose
         self.params, self.state = addict.Dict(), addict.Dict()
 
         self.params.k_p = params('k_p', 0.0)

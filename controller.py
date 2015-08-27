@@ -21,9 +21,8 @@ class Controller(printable.Printable):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, state, verbose=False):
-        super(Controller, self).__init__()
+        super(Controller, self).__init__(verbose)
 
-        self.verbose = verbose
         self.state = state
         self.pid = addict.Dict()
 

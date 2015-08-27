@@ -16,18 +16,18 @@ import planner
 
 
 class Navigation(printable.Printable):
-    def __init__(self, robot, mp, sleep=False, verbose=False):
-        super(Navigation, self).__init__()
+    def __init__(self, robot, params, verbose=False):
+        super(Navigation, self).__init__(verbose)
 
-        self.verbose = verbose
         self.robot = robot
+        self.params = params
+
         self.env = self.robot.GetEnv()
         self.robot_state = state.State(self.env, verbose=self.verbose)
-        self.params = parser.Yaml(file_name='params/simulator.yaml')
 
-        self.planner = planner.find(mp)(self.robot, self.verbose)
+        self.planner = planner.find(self.params.motion_planner)(self.robot, self.verbose)
         self.simulator = simulator.Simulator(
-            self.robot, self.robot_state, self.params, sleep=sleep, verbose=self.verbose)
+            self.robot, self.robot_state, self.params.simulator, verbose=self.verbose)
 
     def execute_trajectory(self, traj, physics=False):
         if physics:

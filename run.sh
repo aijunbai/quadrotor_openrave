@@ -4,15 +4,13 @@ source "conf/config.sh"
 
 PROFILE="False"
 VERBOSE="False"
-PLANNER="rrt"
 TEST="False"
 
-while getopts "pvtm:" opt; do
+while getopts "pvt" opt; do
     case "$opt" in
         p) PROFILE="True";;
         v) VERBOSE="True";;
         t) TEST="True";;
-        m) PLANNER="$OPTARG";;
         *) ;;
     esac
 done
@@ -25,8 +23,6 @@ profile() {
     rm -f $QUADROTOR_PROF
     rm -f $PNG
 }
-
-QUADROTOR="$QUADROTOR --mp $PLANNER"
 
 if [ $VERBOSE = "True" ]; then
     QUADROTOR="$QUADROTOR --verbose"

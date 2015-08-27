@@ -13,8 +13,8 @@ import numpy as np
 
 
 class DragModel(printable.Printable):
-    def __init__(self, params):
-        super(DragModel, self).__init__()
+    def __init__(self, params, verbose=False):
+        super(DragModel, self).__init__(verbose)
 
         self.params = addict.Dict()
         self.params.C_wxy = params('C_wxy', 0.0)
@@ -40,12 +40,11 @@ class DragModel(printable.Printable):
 
 class QuadrotorAerodynamics(printable.Printable):
     def __init__(self, state, wind, params, verbose=False):
-        super(QuadrotorAerodynamics, self).__init__()
+        super(QuadrotorAerodynamics, self).__init__(verbose)
 
         self.state = state
         self.wind = wind
-        self.verbose = verbose
-        self.drag_model = DragModel(params)
+        self.drag_model = DragModel(params, self.verbose)
         self.drag_model.reset()
 
     def apply(self, wrench, dt):

@@ -18,17 +18,16 @@ __author__ = 'Aijun Bai'
 
 
 class Simulator(printable.Printable):
-    def __init__(self, robot, state_, params, sleep=False, verbose=False):
-        super(Simulator, self).__init__()
+    def __init__(self, robot, state_, params, verbose=False):
+        super(Simulator, self).__init__(verbose)
 
         self.robot = robot
         self.env = self.robot.GetEnv()
         self.set_physics_engine(on=False)
 
         self.state = state_
-        self.verbose = verbose
-        self.sleep = sleep
-        self.dt = params('timestep', 0.001)
+        self.sleep = params.sleep
+        self.dt = params.timestep
         self.wind = np.r_[0.0, 0.0, 0.0]
 
         self.aerodynamics = aerodynamics.QuadrotorAerodynamics(
