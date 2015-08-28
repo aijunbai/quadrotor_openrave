@@ -11,7 +11,7 @@ import addict
 __author__ = 'Aijun Bai'
 
 
-def draw_pose(env, pose, reset=False):
+def draw_pose(env, pose, colors=np.array((0, 1, 0)), reset=False):
     if reset:
         draw_pose.handlers.clear()
 
@@ -24,14 +24,14 @@ def draw_pose(env, pose, reset=False):
     yaxis = 0.25 * np.array((-np.sin(angle), np.cos(angle), 0.0))
     points = np.c_[center - xaxis, center + xaxis, center - yaxis, center + yaxis, center + xaxis,
                    center + 0.5 * xaxis + 0.5 * yaxis, center + xaxis, center + 0.5 * xaxis - 0.5 * yaxis]
-    draw_pose.handlers.add(env.drawlinelist(points.T, linewidth=2.0, colors=np.array((0, 1, 0))))
+    draw_pose.handlers.add(env.drawlinelist(points.T, linewidth=2.0, colors=colors))
 
 
-def draw_trajectory(env, traj, reset=False):
+def draw_trajectory(env, traj, colors=np.array((0, 1, 0)), reset=False):
     if reset:
         draw_trajectory.handlers.clear()
 
-    if len(traj):
+    if traj is not None and len(traj):
         if isinstance(traj[0], addict.Dict):
             traj = copy.deepcopy(traj)
             for i, t in enumerate(traj):
@@ -42,7 +42,7 @@ def draw_trajectory(env, traj, reset=False):
             if i != 0:
                 points = np.c_[points, np.r_[pose[0:3]]]
                 draw_trajectory.handlers.add(env.drawlinestrip(
-                    points.T, linewidth=2.0, colors=np.array((0, 1, 0))))
+                    points.T, linewidth=2.0, colors=colors))
 
 
 draw_pose.handlers = set()

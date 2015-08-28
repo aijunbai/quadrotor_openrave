@@ -14,7 +14,14 @@ class Printable(object):
         self.verbose = verbose
 
     def __str__(self):
-        return pprint.pformat(vars(self))
+        if verbose:
+            return pprint.pformat(vars(self))
+        else:
+            return object.__str__(self)
 
     def __repr__(self):
-        return self.__str__()
+        if verbose:
+            return self.__str__()
+        else:
+            return object.__repr__(self)
+

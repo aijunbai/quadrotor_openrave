@@ -1,5 +1,8 @@
 scene: data/quadrotor.env.xml
-motion_planner: ensemble
+motion_planning: 
+    planner: pipeline
+    dof: 4
+    n_steps: 30
 simulator:
     timestep: 0.01
     sleep: False

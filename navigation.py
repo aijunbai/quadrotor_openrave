@@ -8,11 +8,12 @@ import time
 import utils
 import simulator
 import printable
-import addict
-import parser
 import state
 import draw
 import planner
+import bound
+import numpy as np
+import openravepy as rave
 
 
 class Navigation(printable.Printable):
@@ -21,11 +22,12 @@ class Navigation(printable.Printable):
 
         self.robot = robot
         self.params = params
-
         self.env = self.robot.GetEnv()
-        self.robot_state = state.State(self.env, verbose=self.verbose)
+        self.bounds = bound.get_bounds(self.robot, 6)
 
-        self.planner = planner.find(self.params.motion_planner)(self.robot, self.verbose)
+        self.robot_state = state.State(self.env, verbose=self.verbose)
+        self.planner = planner.create_planner(self.params.motion_planning.planner)(
+            self.robot, self.params.motion_planning, self.verbose)
         self.simulator = simulator.Simulator(
             self.robot, self.robot_state, self.params.simulator, verbose=self.verbose)
 
@@ -50,17 +52,32 @@ class Navigation(printable.Printable):
     def run(self):
         while True:
             start = self.robot.GetActiveDOFValues()
-            goal = self.planner.collision_free(self.planner.random_goal)
+            goal = self.collision_free(self.random_goal)
             draw.draw_pose(self.env, goal, reset=True)
+            draw.draw_trajectory(self.env, None, reset=True)
 
             with self.robot:
                 if self.verbose:
                     print 'planning to: {}'.format(goal)
                 traj, total_cost = self.planner.plan(start, goal)
             if traj is not None:
+                time.sleep(1)
                 draw.draw_trajectory(self.env, traj, reset=True)
                 if self.verbose:
                     utils.pv('traj', 'total_cost')
                 self.execute_trajectory(traj)
 
             time.sleep(1)
+
+    def collision_free(self, method):
+        pose = None
+        with self.robot:
+            while True:
+                pose = method()
+                self.robot.SetActiveDOFValues(pose)
+                if not self.env.CheckCollision(self.robot):
+                    break
+        return pose
+
+    def random_goal(self):
+        return bound.sample(self.bounds)
