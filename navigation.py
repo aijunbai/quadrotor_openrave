@@ -60,8 +60,7 @@ class Navigation(printable.Printable):
             if traj is not None:
                 draw.draw_trajectory(self.env, traj, reset=True)
                 if self.verbose:
-                    utils.pv('traj')
-                    utils.pv('total_cost')
+                    utils.pv('traj', 'total_cost')
                 self.execute_trajectory(traj)
 
             time.sleep(1)

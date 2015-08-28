@@ -54,7 +54,7 @@ class Planner(object):
 
     @abc.abstractmethod
     def plan(self, start, goal):
-        pass
+        self.robot.SetActiveDOFValues(start)
 
     def collision_free(self, method):
         pose = None
@@ -69,7 +69,7 @@ class Planner(object):
     def random_goal(self):
         return self.bounds[0, :] + np.random.rand(6) * (self.bounds[1, :] - self.bounds[0, :])
 
-    def traj_from_traj_obj(self, traj_obj):
+    def sample_traj(self, traj_obj):
         spec = traj_obj.GetConfigurationSpecification()
         traj = []
         step = traj_obj.GetDuration() / self.params.n_steps
@@ -79,8 +79,9 @@ class Planner(object):
             pose = rave.poseFromMatrix(T)  # wxyz, xyz
             euler = transformations.euler_from_quaternion(np.r_[pose[1:4], pose[0]])
             traj.append(np.r_[pose[4:7], euler[0:3]])
-
-        return traj
+        if check_traj.traj_is_safe(traj, self.robot):
+            return traj, traj_obj.GetDuration()
+        return None, None
 
 
 class TrajoptPlanner(Planner):
@@ -88,11 +89,15 @@ class TrajoptPlanner(Planner):
         super(TrajoptPlanner, self).__init__(robot, params=params, verbose=verbose)
 
     @staticmethod
-    def create(robot, verbose):
-        return TrajoptPlanner(
-            robot,
-            params=addict.Dict(multi_initialization=10, n_steps=30),
-            verbose=verbose)
+    def create(multi_initialization):
+        def creator(robot, verbose):
+            return TrajoptPlanner(
+                robot,
+                params=addict.Dict(
+                    multi_initialization=multi_initialization,
+                    n_steps=30),
+                verbose=verbose)
+        return creator
 
     @staticmethod
     def make_fullbody_request(end_joints, inittraj, n_steps):
@@ -149,6 +154,8 @@ class TrajoptPlanner(Planner):
         return d
 
     def plan(self, start, goal):
+        super(TrajoptPlanner, self).plan(start, goal)
+
         waypoint_step = (self.params.n_steps - 1) // 2
         waypoints = [(np.r_[start] + np.r_[goal]) / 2]
         solutions = []
@@ -206,80 +213,109 @@ class BaseManipulationPlanner(Planner):
 
     @staticmethod
     def create(robot, verbose):
-        return RRTPlanner(
+        return BaseManipulationPlanner(
             robot,
-            params=addict.Dict(maxiter=3000, steplength=0.1, n_steps=30),
+            params=addict.Dict(
+                maxiter=3000,
+                maxtries=10,
+                steplength=0.1,
+                n_steps=30),
             verbose=verbose)
 
     def plan(self, start, goal):
-        with self.robot:
-            self.robot.SetActiveDOFs(
-                [], rave.DOFAffine.X | rave.DOFAffine.Y | rave.DOFAffine.Z | rave.DOFAffine.RotationAxis, [0, 0, 1])
+        super(BaseManipulationPlanner, self).plan(start, goal)
 
-            start = np.r_[start[0:3], start[5]]
-            goal = np.r_[goal[0:3], goal[5]]
-            self.robot.SetActiveDOFValues(start)
-
-            traj_obj = self.basemanip.MoveActiveJoints(
-                goal=goal, outputtrajobj=True, execute=False,
-                maxiter=self.params.maxiter, steplength=self.params.steplength)
-            traj = self.traj_from_traj_obj(traj_obj)
-            if check_traj.traj_is_safe(traj, self.robot):
-                return traj, traj_obj.GetDuration()
-
-        return None, None
+        traj_obj = self.basemanip.MoveActiveJoints(
+            goal=goal,
+            outputtrajobj=True,
+            execute=False,
+            maxiter=self.params.maxiter,
+            maxtries=self.params.maxtries,
+            steplength=self.params.steplength,
+            postprocessingplanner='parabolicsmoother')
+        return self.sample_traj(traj_obj)
 
 
-class OMPLPlanner(Planner):
+class RavePlanner(Planner):
     def __init__(self, robot, params=None, verbose=False):
-        super(OMPLPlanner, self).__init__(robot, params=params, verbose=verbose)
-        self.planner = rave.RaveCreatePlanner(self.env, self.params.ompl_planner)
+        super(RavePlanner, self).__init__(robot, params=params, verbose=verbose)
+        self.planner = rave.RaveCreatePlanner(self.env, self.params.rave_planner)
 
     @staticmethod
-    def create(ompl_planner):
+    def create(rave_planner):
         def creator(robot, verbose):
-            return OMPLPlanner(
+            return RavePlanner(
                 robot,
-                params=addict.Dict(ompl_planner=ompl_planner, n_steps=30),
+                params=addict.Dict(
+                    rave_planner=rave_planner,
+                    n_steps=30),
                 verbose=verbose)
         return creator
 
     def plan(self, start, goal):
-        with self.robot:
-            self.robot.SetActiveDOFs(
-                [], rave.DOFAffine.X | rave.DOFAffine.Y | rave.DOFAffine.Z | rave.DOFAffine.RotationAxis, [0, 0, 1])
+        super(RavePlanner, self).plan(start, goal)
 
-            start = np.r_[start[0:3], start[5]]
-            goal = np.r_[goal[0:3], goal[5]]
-            self.robot.SetActiveDOFValues(start)
+        params = rave.Planner.PlannerParameters()
+        params.SetRobotActiveJoints(self.robot)
+        params.SetGoalConfig(goal)
 
-            # Setup the planning instance.
-            params = rave.Planner.PlannerParameters()
-            params.SetRobotActiveJoints(self.robot)
-            params.SetGoalConfig(goal)
+        params.SetExtraParameters(
+            """<_postprocessing planner="parabolicsmoother">
+                <_nmaxiterations>40</_nmaxiterations>
+                </_postprocessing>""")
 
-            # Set the timeout and planner-specific parameters. You can view a list of
-            # supported parameters by calling: planner.SendCommand('GetParameters')
-            params.SetExtraParameters('<range>0.02</range>')
+        with self.env:
+            traj_obj = rave.RaveCreateTrajectory(self.env, '')
+            self.planner.InitPlan(self.robot, params)
+            self.planner.PlanPath(traj_obj)
+            return self.sample_traj(traj_obj)
 
-            with self.env:
-                # Invoke the planner.
-                traj_obj = rave.RaveCreateTrajectory(self.env, '')
-                self.planner.InitPlan(self.robot, params)
-                self.planner.PlanPath(traj_obj)
-                traj = self.traj_from_traj_obj(traj_obj)
-                if check_traj.traj_is_safe(traj, self.robot):
-                    return traj, traj_obj.GetDuration()
+
+class EnsemblePlanner(Planner):
+    def __init__(self, robot, params=None, verbose=False):
+        super(EnsemblePlanner, self).__init__(robot, params=params, verbose=verbose)
+
+        self.planners = []
+        self.planners.append(TrajoptPlanner.create(1)(robot, verbose=verbose))
+        self.planners.append(BaseManipulationPlanner.create(robot, verbose=verbose))
+        self.planners.append(RavePlanner.create('BiRRT')(robot, verbose=verbose))
+        self.planners.append(TrajoptPlanner.create(10)(robot, verbose=verbose))
+        self.planners.append(TrajoptPlanner.create(100)(robot, verbose=verbose))
+
+    @staticmethod
+    def create(robot, verbose):
+        return EnsemblePlanner(
+            robot,
+            verbose=verbose)
+    
+    def plan(self, start, goal):
+        super(EnsemblePlanner, self).plan(start, goal)
+
+        for p in self.planners:
+            traj, cost = p.plan(start, goal)
+            if traj is not None:
+                utils.pv('p')
+                return traj, cost
 
         return None, None
 
 
 def find(name, planners=addict.Dict()):
     if len(planners) == 0:
-        planners.trajopt = TrajoptPlanner.create
         planners.basemanip = BaseManipulationPlanner.create
-        planners.OMPL_RRTConnect = OMPLPlanner.create('OMPL_RRTConnect')
-        planners.OMPL_SBL = OMPLPlanner.create('OMPL_SBL')
-        planners.sbpl = OMPLPlanner.create('sbpl')
-        planners.BiRRT = OMPLPlanner.create('BiRRT')
-    return planners[name]
+        planners.trajopt = TrajoptPlanner.create(1)
+        planners.trajopt_multi = TrajoptPlanner.create(10)
+        planners.trajopt_multi2 = TrajoptPlanner.create(100)
+        planners.BiRRT = RavePlanner.create('BiRRT')
+        planners.BasicRRT = RavePlanner.create('BasicRRT')
+        planners.sbpl = RavePlanner.create('sbpl')
+        planners.ExplorationRRT = RavePlanner.create('ExplorationRRT')
+        planners.RAStar = RavePlanner.create('RAStar')
+        planners.OMPL_RRTConnect = RavePlanner.create('OMPL_RRTConnect')
+        planners.OMPL_PRM = RavePlanner.create('OMPL_PRM')
+        planners.ensemble = EnsemblePlanner.create
+
+    if name in planners:
+        return planners[name]
+    else:
+        raise KeyError('can not find planner "{}"'.format(name))

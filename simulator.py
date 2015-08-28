@@ -56,6 +56,8 @@ class Simulator(printable.Printable):
             self.run(command)
         else:
             for (i, row) in enumerate(traj):
+                if self.verbose:
+                    utils.pv('i', 'row')
                 self.robot.SetActiveDOFValues(row)
                 draw.draw_pose(self.env, row)
                 time.sleep(0.1)
