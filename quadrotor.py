@@ -35,7 +35,6 @@ def run(args=None):
 
     try:
         params = parser.Yaml(file_name=options.params)
-        print params
 
         env = rave.Environment()
         env.SetViewer('qtcoin')

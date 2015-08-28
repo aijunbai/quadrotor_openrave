@@ -56,11 +56,6 @@ class Planner(object):
     def plan(self, start, goal):
         pass
 
-    @staticmethod
-    @abc.abstractmethod
-    def create(robot, verbose):
-        pass
-
     def collision_free(self, method):
         pose = None
         with self.robot:
@@ -73,6 +68,19 @@ class Planner(object):
 
     def random_goal(self):
         return self.bounds[0, :] + np.random.rand(6) * (self.bounds[1, :] - self.bounds[0, :])
+
+    def traj_from_traj_obj(self, traj_obj):
+        spec = traj_obj.GetConfigurationSpecification()
+        traj = []
+        step = traj_obj.GetDuration() / self.params.n_steps
+        for i in range(self.params.n_steps):
+            data = traj_obj.Sample(i * step)
+            T = spec.ExtractTransform(None, data, self.robot)
+            pose = rave.poseFromMatrix(T)  # wxyz, xyz
+            euler = transformations.euler_from_quaternion(np.r_[pose[1:4], pose[0]])
+            traj.append(np.r_[pose[4:7], euler[0:3]])
+
+        return traj
 
 
 class TrajoptPlanner(Planner):
@@ -191,9 +199,9 @@ class TrajoptPlanner(Planner):
         return None, None
 
 
-class RRTPlanner(Planner):
+class BaseManipulationPlanner(Planner):
     def __init__(self, robot, params=None, verbose=False):
-        super(RRTPlanner, self).__init__(robot, params=params, verbose=verbose)
+        super(BaseManipulationPlanner, self).__init__(robot, params=params, verbose=verbose)
         self.basemanip = rave.interfaces.BaseManipulation(self.robot)
 
     @staticmethod
@@ -215,18 +223,53 @@ class RRTPlanner(Planner):
             traj_obj = self.basemanip.MoveActiveJoints(
                 goal=goal, outputtrajobj=True, execute=False,
                 maxiter=self.params.maxiter, steplength=self.params.steplength)
-
-            spec = traj_obj.GetConfigurationSpecification()
-            traj = []
-            step = traj_obj.GetDuration() / self.params.n_steps
-            for i in range(self.params.n_steps):
-                data = traj_obj.Sample(i * step)
-                T = spec.ExtractTransform(None, data, self.robot)
-                pose = rave.poseFromMatrix(T)  # wxyz, xyz
-                euler = transformations.euler_from_quaternion(np.r_[pose[1:4], pose[0]])
-                traj.append(np.r_[pose[4:7], euler[0:3]])
+            traj = self.traj_from_traj_obj(traj_obj)
             if check_traj.traj_is_safe(traj, self.robot):
                 return traj, traj_obj.GetDuration()
+
+        return None, None
+
+
+class OMPLPlanner(Planner):
+    def __init__(self, robot, params=None, verbose=False):
+        super(OMPLPlanner, self).__init__(robot, params=params, verbose=verbose)
+        self.planner = rave.RaveCreatePlanner(self.env, self.params.ompl_planner)
+
+    @staticmethod
+    def create(ompl_planner):
+        def creator(robot, verbose):
+            return OMPLPlanner(
+                robot,
+                params=addict.Dict(ompl_planner=ompl_planner, n_steps=30),
+                verbose=verbose)
+        return creator
+
+    def plan(self, start, goal):
+        with self.robot:
+            self.robot.SetActiveDOFs(
+                [], rave.DOFAffine.X | rave.DOFAffine.Y | rave.DOFAffine.Z | rave.DOFAffine.RotationAxis, [0, 0, 1])
+
+            start = np.r_[start[0:3], start[5]]
+            goal = np.r_[goal[0:3], goal[5]]
+            self.robot.SetActiveDOFValues(start)
+
+            # Setup the planning instance.
+            params = rave.Planner.PlannerParameters()
+            params.SetRobotActiveJoints(self.robot)
+            params.SetGoalConfig(goal)
+
+            # Set the timeout and planner-specific parameters. You can view a list of
+            # supported parameters by calling: planner.SendCommand('GetParameters')
+            params.SetExtraParameters('<range>0.02</range>')
+
+            with self.env:
+                # Invoke the planner.
+                traj_obj = rave.RaveCreateTrajectory(self.env, '')
+                self.planner.InitPlan(self.robot, params)
+                self.planner.PlanPath(traj_obj)
+                traj = self.traj_from_traj_obj(traj_obj)
+                if check_traj.traj_is_safe(traj, self.robot):
+                    return traj, traj_obj.GetDuration()
 
         return None, None
 
@@ -234,5 +277,9 @@ class RRTPlanner(Planner):
 def find(name, planners=addict.Dict()):
     if len(planners) == 0:
         planners.trajopt = TrajoptPlanner.create
-        planners.rrt = RRTPlanner.create
+        planners.basemanip = BaseManipulationPlanner.create
+        planners.OMPL_RRTConnect = OMPLPlanner.create('OMPL_RRTConnect')
+        planners.OMPL_SBL = OMPLPlanner.create('OMPL_SBL')
+        planners.sbpl = OMPLPlanner.create('sbpl')
+        planners.BiRRT = OMPLPlanner.create('BiRRT')
     return planners[name]

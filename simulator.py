@@ -26,34 +26,39 @@ class Simulator(printable.Printable):
         self.set_physics_engine(on=False)
 
         self.state = state_
-        self.sleep = params.sleep
-        self.dt = params.timestep
+        self.params = params
         self.wind = np.r_[0.0, 0.0, 0.0]
 
         self.aerodynamics = aerodynamics.QuadrotorAerodynamics(
-            self.state, self.wind, params=params.aerodynamics, verbose=self.verbose)
+            self.state, self.wind, params=self.params.aerodynamics, verbose=self.verbose)
 
         self.controllers = []
         self.controllers.append(
-            controller.TrajectoryController(self.state, params=params.controller.trajectory, verbose=self.verbose))
+            controller.TrajectoryController(self.state, params=self.params.controller.trajectory, verbose=self.verbose))
         self.controllers.append(
-            controller.PoseController(self.state, params=params.controller.pose, verbose=self.verbose))
+            controller.PoseController(self.state, params=self.params.controller.pose, verbose=self.verbose))
         self.controllers.append(
-            controller.TwistController(self.state, params=params.controller.twist, verbose=self.verbose))
+            controller.TwistController(self.state, params=self.params.controller.twist, verbose=self.verbose))
 
     def reset(self):
         for c in self.controllers:
             c.reset()
 
     def follow(self, traj):
-        command = addict.Dict()
-        command.trajectory = []
+        if self.params.physics:
+            command = addict.Dict()
+            command.trajectory = []
 
-        for t in traj:
-            pose = addict.Dict(x=t[0], y=t[1], z=t[2], yaw=t[5])
-            command.trajectory.append(pose)
+            for t in traj:
+                pose = addict.Dict(x=t[0], y=t[1], z=t[2], yaw=t[5])
+                command.trajectory.append(pose)
 
-        self.run(command)
+            self.run(command)
+        else:
+            for (i, row) in enumerate(traj):
+                self.robot.SetActiveDOFValues(row)
+                draw.draw_pose(self.env, row)
+                time.sleep(0.1)
 
     def run(self, command, max_steps=10000):
         """
@@ -78,11 +83,13 @@ class Simulator(printable.Printable):
             pipeline[0] = command
             self.state.update(step)
             for i, c in enumerate(self.controllers):
-                pipeline[i + 1] = c.update(pipeline[i], self.dt)
+                pipeline[i + 1] = c.update(pipeline[i], self.params.timestep)
 
             self.state.apply(
                 self.aerodynamics.apply(
-                    pipeline[len(self.controllers)].wrench, self.dt), self.dt)
+                    pipeline[len(self.controllers)].wrench,
+                    self.params.timestep),
+                self.params.timestep)
             finished = self.controllers[0].finished()
 
             if finished or not self.state.valid():
@@ -92,7 +99,7 @@ class Simulator(printable.Printable):
                     return False, step
                 break
 
-            if self.sleep:
+            if self.params.sleep:
                 time.sleep(max(self.dt - time.time() + start, 0.0))
 
         return True, step

@@ -29,14 +29,8 @@ class Navigation(printable.Printable):
         self.simulator = simulator.Simulator(
             self.robot, self.robot_state, self.params.simulator, verbose=self.verbose)
 
-    def execute_trajectory(self, traj, physics=False):
-        if physics:
-            self.simulator.follow(traj)
-        else:
-            for (i, row) in enumerate(traj):
-                self.robot.SetActiveDOFValues(row)
-                draw.draw_pose(self.env, row)
-                time.sleep(0.1)
+    def execute_trajectory(self, traj):
+        self.simulator.follow(traj)
         self.robot.SetActiveDOFValues(traj[-1])
 
     def test(self, command_func, test_count=1, max_steps=10000):
@@ -68,6 +62,6 @@ class Navigation(printable.Printable):
                 if self.verbose:
                     utils.pv('traj')
                     utils.pv('total_cost')
-                self.execute_trajectory(traj, physics=True)
+                self.execute_trajectory(traj)
 
             time.sleep(1)
