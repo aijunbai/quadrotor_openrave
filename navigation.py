@@ -59,12 +59,12 @@ class Navigation(printable.Printable):
             with self.robot:
                 if self.verbose:
                     print 'planning to: {}'.format(goal)
-                traj, total_cost = self.planner.plan(start, goal)
+                traj, cost = self.planner.plan(start, goal)
             if traj is not None:
                 time.sleep(1)
                 draw.draw_trajectory(self.env, traj, reset=True)
                 if self.verbose:
-                    utils.pv('traj', 'total_cost')
+                    utils.pv('traj', 'cost')
                 self.execute_trajectory(traj)
 
             time.sleep(1)

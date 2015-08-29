@@ -55,10 +55,6 @@ def pv(*args, **kwargs):
         pause()
 
 
-def mean(samples):
-    return sum(samples) / len(samples) if len(samples) else 0.0
-
-
 def dist(a, b):
     a_ = np.array(a)
     b_ = np.array(b)

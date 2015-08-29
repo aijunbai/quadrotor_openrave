@@ -5,9 +5,9 @@ motion_planning:
     n_steps: 30
     first_return: True
 simulator:
-    timestep: 0.01
-    sleep: False
     physics: False
+    sleep: False
+    timestep: 0.01
     controller:
         trajectory:
             yaw_control: False

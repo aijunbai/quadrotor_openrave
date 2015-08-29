@@ -31,7 +31,7 @@ def draw_trajectory(env, traj, colors=np.array((0, 1, 0)), reset=False):
     if reset:
         draw_trajectory.handlers.clear()
 
-    if traj is not None and len(traj):
+    if traj is not None:
         if isinstance(traj[0], addict.Dict):
             traj = copy.deepcopy(traj)
             for i, t in enumerate(traj):

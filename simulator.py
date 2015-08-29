@@ -58,7 +58,7 @@ class Simulator(printable.Printable):
             for (i, row) in enumerate(traj):
                 self.robot.SetActiveDOFValues(row)
                 draw.draw_pose(self.env, row)
-                time.sleep(0.1)
+                time.sleep(self.params.timestep)
 
     def run(self, command, max_steps=10000):
         """
@@ -79,15 +79,15 @@ class Simulator(printable.Printable):
             if self.verbose:
                 print '\nstep: {}, time: {}'.format(step, self.get_sim_time())
 
-            pipeline = utils.makehash()
-            pipeline[0] = command
             self.state.update(step)
-            for i, c in enumerate(self.controllers):
-                pipeline[i + 1] = c.update(pipeline[i], self.params.timestep)
+
+            pipeline = [command]
+            for c in self.controllers:
+                pipeline.append(c.update(pipeline[-1], self.params.timestep))
 
             self.state.apply(
                 self.aerodynamics.apply(
-                    pipeline[len(self.controllers)].wrench,
+                    pipeline[-1].wrench,
                     self.params.timestep),
                 self.params.timestep)
             finished = self.controllers[0].finished()

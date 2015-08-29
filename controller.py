@@ -174,7 +174,7 @@ class TrajectoryController(Controller):
         self.traj_idx = 0
 
     def finished(self):
-        return len(self.input_.trajectory) and \
+        return self.input_.trajectory and \
             self.traj_idx >= len(self.input_.trajectory) - 1
 
     def pose(self):
@@ -190,7 +190,7 @@ class TrajectoryController(Controller):
         return np.r_[pose_.x, pose_.y, pose_.z, pose_.yaw]
 
     def process(self):
-        if len(self.input_.trajectory):
+        if self.input_.trajectory:
             self.output.pose = self.pose()
 
             while utils.dist(

@@ -6,51 +6,43 @@ from __future__ import with_statement  # for python 2.5
 
 import time
 import openravepy as rave
-
+import argparse
 import parser
+
 import navigation
 import test
 
 __author__ = 'Aijun Bai'
 
 
-from optparse import OptionParser
+def parse_args():
+    arg_parser = argparse.ArgumentParser()
+
+    arg_parser.add_argument('--verbose', action='store_true')
+    arg_parser.add_argument('--test', action='store_true')
+    arg_parser.add_argument('--params', default='params/quadrotor.yaml')
+
+    return arg_parser.parse_args()
 
 
 @rave.with_destroy
-def run(args=None):
-    opt_parser = OptionParser(description='Quadrotor')
+def run():
+    args = parse_args()
+    params = parser.Yaml(file_name=args.params)
 
-    opt_parser.add_option('--params',
-                          action='store', type='string', dest='params', default='params/quadrotor.yaml',
-                          help='Scene file to load (default=%default)')
-    opt_parser.add_option('--verbose',
-                          action='store_true', dest='verbose', default=False,
-                          help='Set verbose output (default=%default)')
-    opt_parser.add_option('--test',
-                          action='store_true', dest='test', default=False,
-                          help='Test mode (default=%default)')
+    env = rave.Environment()
+    env.SetViewer('qtcoin')
+    env.Load(params.scene)
+    env.UpdatePublishedBodies()
+    robot = env.GetRobots()[0]
 
-    (options, leftargs) = opt_parser.parse_args(args=args)
+    time.sleep(0.1)  # give time for environment to update
+    navi = navigation.Navigation(robot, params, verbose=args.verbose)
 
-    try:
-        params = parser.Yaml(file_name=options.params)
-
-        env = rave.Environment()
-        env.SetViewer('qtcoin')
-        env.Load(params.scene)
-        env.UpdatePublishedBodies()
-        robot = env.GetRobots()[0]
-
-        time.sleep(0.1)  # give time for environment to update
-        navi = navigation.Navigation(robot, params, verbose=options.verbose)
-
-        if options.test:
-            test.test(navi)
-        else:
-            navi.run()
-    finally:
-        env.Destroy()
+    if args.test:
+        test.test(navi)
+    else:
+        navi.run()
 
 if __name__ == "__main__":
     rave.RaveSetDebugLevel(rave.DebugLevel.Debug)

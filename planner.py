@@ -58,7 +58,7 @@ class Planner(object):
 
             self.robot.SetActiveDOFValues(start)
             traj, cost = plan(self, start, goal)
-            if traj is not None and len(traj):
+            if traj is not None:
                 if self.params.dof == 4 and traj[0].size == 4:
                     traj = Planner.four_to_six([t for t in traj])
                 return traj, cost
@@ -181,8 +181,8 @@ class TrajoptPlanner(Planner):
         if traj is not None:
             draw.draw_trajectory(self.env, traj)
             if check_traj.traj_is_safe(traj, self.robot):
-                total_cost = sum(cost[1] for cost in result.GetCosts())
-                return traj, total_cost
+                cost = sum(cost[1] for cost in result.GetCosts())
+                return traj, cost
 
         return None, None
 
@@ -214,14 +214,14 @@ class TrajoptPlanner(Planner):
             inittraj[:waypoint_step + 1] = mu.linspace2d(start, waypoint, waypoint_step + 1)
             inittraj[waypoint_step:] = mu.linspace2d(waypoint, goal, self.params.n_steps - waypoint_step)
 
-            traj, total_cost = self.plan_with_inittraj(
+            traj, cost = self.plan_with_inittraj(
                 start, goal, inittraj)
             if traj is not None:
-                solutions.append((traj, total_cost))
+                solutions.append((traj, cost))
                 if i == 0 or self.params.first_return:
                     break
 
-        if len(solutions):
+        if solutions:
             return sorted(solutions, key=lambda x: x[1])[0]
 
         return None, None
