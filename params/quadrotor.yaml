@@ -3,6 +3,7 @@ motion_planning:
     planner: pipeline
     dof: 4
     n_steps: 30
+    first_return: True
 simulator:
     timestep: 0.01
     sleep: False

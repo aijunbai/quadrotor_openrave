@@ -218,7 +218,7 @@ class TrajoptPlanner(Planner):
                 start, goal, inittraj)
             if traj is not None:
                 solutions.append((traj, total_cost))
-                if i == 0:
+                if i == 0 or self.params.first_return:
                     break
 
         if len(solutions):
@@ -360,10 +360,6 @@ class PipelinePlanner(Planner):
 def create_planner(name, planners=addict.Dict()):
     if len(planners) == 0:
         planners.basemanip = BaseManipulationPlanner.create
-        planners.optimizing = TrajoptPlanner.create(1)
-        planners.optimizing_multi = TrajoptPlanner.create(10)
-        planners.optimizing_multi2 = TrajoptPlanner.create(100)
-        planners.optimizing_multi3 = TrajoptPlanner.create(1000)
         planners.birrt = RavePlanner.create('BiRRT')
         planners.basicrrt = RavePlanner.create('BasicRRT')
         planners.sbpl = RavePlanner.create('sbpl')
@@ -374,6 +370,10 @@ def create_planner(name, planners=addict.Dict()):
         planners.ensembling = EnsemblePlanner.create(
             EnsemblePlanner.SAMPLING | EnsemblePlanner.OPTIMIZING)
         planners.sampling = EnsemblePlanner.create(EnsemblePlanner.SAMPLING)
+        planners.optimizing = TrajoptPlanner.create(1)
+        planners.optimizing_multi = TrajoptPlanner.create(10)
+        planners.optimizing_multi2 = TrajoptPlanner.create(100)
+        planners.optimizing_multi3 = TrajoptPlanner.create(1000)
         planners.random_optimizing = EnsemblePlanner.create(EnsemblePlanner.OPTIMIZING)
         planners.pipeline = PipelinePlanner.create
 
