@@ -242,15 +242,19 @@ class BaseManipulationPlanner(Planner):
 
     @Planner.filter
     def plan(self, start, goal):
-        traj_obj = self.basemanip.MoveActiveJoints(
-            goal=goal,
-            outputtrajobj=True,
-            execute=False,
-            maxiter=self.params.maxiter,
-            maxtries=self.params.maxtries,
-            steplength=self.params.steplength,
-            postprocessingplanner='parabolicsmoother')
-        return self.sample_traj(traj_obj)
+        try:
+            traj_obj = self.basemanip.MoveActiveJoints(
+                goal=goal,
+                outputtrajobj=True,
+                execute=False,
+                maxiter=self.params.maxiter,
+                maxtries=self.params.maxtries,
+                steplength=self.params.steplength,
+                postprocessingplanner='parabolicsmoother')
+            return self.sample_traj(traj_obj)
+        except rave.openrave_exception as e:
+            print e
+            return None, None
 
 
 class RavePlanner(Planner):
@@ -269,20 +273,24 @@ class RavePlanner(Planner):
 
     @Planner.filter
     def plan(self, start, goal):
-        params = rave.Planner.PlannerParameters()
-        params.SetRobotActiveJoints(self.robot)
-        params.SetGoalConfig(goal)
+        try:
+            params = rave.Planner.PlannerParameters()
+            params.SetRobotActiveJoints(self.robot)
+            params.SetGoalConfig(goal)
 
-        params.SetExtraParameters(
-            """<_postprocessing planner="parabolicsmoother">
-                <_nmaxiterations>40</_nmaxiterations>
-                </_postprocessing>""")
+            params.SetExtraParameters(
+                """<_postprocessing planner="ParabolicSmoother">
+                    <_nmaxiterations>40</_nmaxiterations>
+                    </_postprocessing>""")
 
-        with self.env:
-            traj_obj = rave.RaveCreateTrajectory(self.env, '')
-            self.planner.InitPlan(self.robot, params)
-            self.planner.PlanPath(traj_obj)
-            return self.sample_traj(traj_obj)
+            with self.env:
+                traj_obj = rave.RaveCreateTrajectory(self.env, '')
+                self.planner.InitPlan(self.robot, params)
+                self.planner.PlanPath(traj_obj)
+                return self.sample_traj(traj_obj)
+        except rave.openrave_exception as e:
+            print e
+            return None, None
 
 
 class EnsemblePlanner(Planner):
