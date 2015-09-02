@@ -4,8 +4,10 @@ from __future__ import division
 from __future__ import with_statement  # for python 2.5
 
 import abc
+import sys
 import json
 import copy
+from memoized import memoized
 import numpy as np
 import openravepy as rave
 
@@ -25,7 +27,7 @@ __author__ = 'Aijun Bai'
 class Planner(object):
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, robot, params, verbose=False):
+    def __init__(self, robot, params=None, verbose=False):
         self.robot = robot
         self.params = params
         self.env = self.robot.GetEnv()
@@ -57,6 +59,7 @@ class Planner(object):
                 goal = Planner.six_to_four(goal)
 
             self.robot.SetActiveDOFValues(start)
+            print '{} does planning at depth {}...'.format(self.__class__.__name__, self.params.depth)
             traj, cost = plan(self, start, goal)
             if traj is not None:
                 if self.params.dof == 4 and traj[0].size == 4:
@@ -94,6 +97,7 @@ class TrajoptPlanner(Planner):
     def create(multi_initialization):
         def creator(robot, params, verbose):
             params = copy.deepcopy(params)
+            params.depth += 1
             params.multi_initialization = multi_initialization
             return TrajoptPlanner(robot, params=params, verbose=verbose)
         return creator
@@ -139,21 +143,31 @@ class TrajoptPlanner(Planner):
                 }
             ],
             "constraints": [
-                {"type": "joint", "params": {
-                    "vals": end_joints
+                {
+                    "type": "joint",
+                    "params": {
+                        "vals": end_joints
+                    }
                 }
-                 }
-            ],
-            "init_info": {
+            ]
+        }
+
+        if inittraj is not None:
+            d["init_info"] = {
                 "type": "given_traj",
                 "data": [row.tolist() for row in inittraj]
             }
-        }
+        else:
+            d["init_info"] = {
+                "type": "straight_line",
+                "endpoint": end_joints
+            }
 
         return d
 
-    def plan_with_inittraj(self, start, goal, inittraj):
-        draw.draw_trajectory(self.env, inittraj, colors=np.array((0.5, 0.5, 0.5)))
+    def plan_with_inittraj(self, start, goal, inittraj=None):
+        if self.verbose:
+            draw.draw_trajectory(self.env, inittraj, colors=np.array((0.5, 0.5, 0.5)))
 
         with self.robot:
             self.robot.SetActiveDOFValues(start)
@@ -179,82 +193,69 @@ class TrajoptPlanner(Planner):
         prob.SetRobotActiveDOFs()
 
         if traj is not None:
-            draw.draw_trajectory(self.env, traj)
+            if self.verbose:
+                draw.draw_trajectory(self.env, traj)
             if check_traj.traj_is_safe(traj, self.robot):
                 cost = sum(cost[1] for cost in result.GetCosts())
                 return traj, cost
 
         return None, None
 
-    def random_waypoint(self, bounds):
-        waypoint = None
-        with self.robot:
-            while True:
-                waypoint = bound.sample(bounds)
-                self.robot.SetActiveDOFValues(waypoint)
-                if not self.env.CheckCollision(self.robot):
-                    break
-        return waypoint
+    @property
+    @memoized
+    def int_planner(self):
+        print '{} creates int_planner at depth {}...'.format(self.__class__.__name__, self.params.depth)
+        params = copy.deepcopy(self.params)
+        params.n_steps = self.params.n_steps // 2
+        return create_planner('optimizing')(self.robot, params=params, verbose=self.verbose)
+
+    def gen_waypoint(self, bounds, maxiter=10):
+        for i in range(self.params.multi_initialization):
+            waypoint = None
+            for j in range(maxiter):
+                with self.robot:
+                    waypoint = bound.sample(bounds)
+                    self.robot.SetActiveDOFValues(waypoint)
+                    if not self.env.CheckCollision(self.robot):
+                        break
+            yield waypoint
 
     @Planner.filter
     def plan(self, start, goal):
+        if self.params.multi_initialization <= 1:
+            return self.plan_with_inittraj(start, goal)
+
         bounds = bound.get_bounds(self.robot, self.params.dof)
-        waypoint_step = (self.params.n_steps - 1) // 2
-        waypoints = [(np.r_[start] + np.r_[goal]) / 2]
-        waypoints.extend(
-            [self.random_waypoint(bounds) for _ in
-             range(self.params.multi_initialization - 1)])  # TODO: more efficient sampling
+        waypoint_step = self.params.n_steps // 2
         solutions = []
 
-        for i, waypoint in enumerate(waypoints):
+        for waypoint in self.gen_waypoint(bounds):
             if self.verbose:
-                utils.pv('i', 'waypoint')
+                utils.pv('waypoint')
 
-            inittraj = np.empty((self.params.n_steps, self.params.dof))
-            inittraj[:waypoint_step + 1] = mu.linspace2d(start, waypoint, waypoint_step + 1)
-            inittraj[waypoint_step:] = mu.linspace2d(waypoint, goal, self.params.n_steps - waypoint_step)
-
-            traj, cost = self.plan_with_inittraj(
-                start, goal, inittraj)
-            if traj is not None:
-                solutions.append((traj, cost))
-                if i == 0 or self.params.first_return:
-                    break
+            inittraj = None
+            traj1, _ = self.int_planner.plan(start, waypoint)
+            if traj1 is not None:
+                traj2, _ = self.int_planner.plan(waypoint, goal)
+                if traj2 is not None:
+                    inittraj = np.empty((self.params.n_steps, self.params.dof))
+                    if self.params.dof == 4:
+                        inittraj[:waypoint_step] = Planner.six_to_four([t for t in traj1])
+                        inittraj[waypoint_step:] = Planner.six_to_four([t for t in traj2])
+                    else:
+                        inittraj[:waypoint_step] = traj1
+                        inittraj[waypoint_step:] = traj2
+                if inittraj is not None:
+                    traj, cost = self.plan_with_inittraj(start, goal, inittraj=inittraj)
+                    if traj is not None:
+                        solutions.append((traj, cost))
+                        if self.params.first_return:
+                            break
 
         if solutions:
             return sorted(solutions, key=lambda x: x[1])[0]
 
         return None, None
-
-
-class BaseManipulationPlanner(Planner):
-    def __init__(self, robot, params, verbose=False):
-        super(BaseManipulationPlanner, self).__init__(robot, params=params, verbose=verbose)
-        self.basemanip = rave.interfaces.BaseManipulation(self.robot)
-
-    @staticmethod
-    def create(robot, params, verbose):
-        params = copy.deepcopy(params)
-        params.maxiter = 3000
-        params.maxtries = 10
-        params.steplength = 0.1
-        return BaseManipulationPlanner(robot, params=params, verbose=verbose)
-
-    @Planner.filter
-    def plan(self, start, goal):
-        try:
-            traj_obj = self.basemanip.MoveActiveJoints(
-                goal=goal,
-                outputtrajobj=True,
-                execute=False,
-                maxiter=self.params.maxiter,
-                maxtries=self.params.maxtries,
-                steplength=self.params.steplength,
-                postprocessingplanner='parabolicsmoother')
-            return self.sample_traj(traj_obj)
-        except rave.openrave_exception as e:
-            print e
-            return None, None
 
 
 class RavePlanner(Planner):
@@ -266,31 +267,41 @@ class RavePlanner(Planner):
     def create(rave_planner):
         def creator(robot, params, verbose):
             params = copy.deepcopy(params)
+            params.depth += 1
             params.rave_planner = rave_planner
             return RavePlanner(robot, params=params, verbose=verbose)
 
         return creator
 
+    def plan_with_smoother(self, start, goal, smoother):
+        params = rave.Planner.PlannerParameters()
+        self.robot.SetActiveDOFValues(start)
+        params.SetRobotActiveJoints(self.robot)
+        params.SetGoalConfig(goal)
+
+        if smoother:
+            params.SetExtraParameters(
+                """<_postprocessing planner="{}">
+                    <_nmaxiterations>40</_nmaxiterations>
+                    </_postprocessing>""".format(smoother))
+
+        with self.env:
+            traj_obj = rave.RaveCreateTrajectory(self.env, '')
+            self.planner.InitPlan(self.robot, params)
+            self.planner.PlanPath(traj_obj)
+            return self.sample_traj(traj_obj)
+
     @Planner.filter
     def plan(self, start, goal):
-        try:
-            params = rave.Planner.PlannerParameters()
-            params.SetRobotActiveJoints(self.robot)
-            params.SetGoalConfig(goal)
+        smoothers = ['ParabolicSmoother', 'LinearSmoother', None]
 
-            params.SetExtraParameters(
-                """<_postprocessing planner="ParabolicSmoother">
-                    <_nmaxiterations>40</_nmaxiterations>
-                    </_postprocessing>""")
+        for smoother in smoothers:
+            try:
+                return self.plan_with_smoother(start, goal, smoother)
+            except rave.openrave_exception as e:
+                print e
 
-            with self.env:
-                traj_obj = rave.RaveCreateTrajectory(self.env, '')
-                self.planner.InitPlan(self.robot, params)
-                self.planner.PlanPath(traj_obj)
-                return self.sample_traj(traj_obj)
-        except rave.openrave_exception as e:
-            print e
-            return None, None
+        return None, None
 
 
 class EnsemblePlanner(Planner):
@@ -304,18 +315,16 @@ class EnsemblePlanner(Planner):
             self.planners.append(create_planner('optimizing')(robot, params=self.params, verbose=verbose))
 
         if self.params.kclass & EnsemblePlanner.SAMPLING:
-            self.planners.append(create_planner('basemanip')(robot, params=self.params, verbose=verbose))
             self.planners.append(create_planner('birrt')(robot, params=self.params, verbose=verbose))
 
         if self.params.kclass & EnsemblePlanner.OPTIMIZING:
             self.planners.append(create_planner('optimizing_multi')(robot, params=self.params, verbose=verbose))
-            self.planners.append(create_planner('optimizing_multi2')(robot, params=self.params, verbose=verbose))
-            self.planners.append(create_planner('optimizing_multi3')(robot, params=self.params, verbose=verbose))
 
     @staticmethod
     def create(kclass=0):
         def creator(robot, params, verbose):
             params = copy.deepcopy(params)
+            params.depth += 1
             params.kclass = kclass
             return EnsemblePlanner(robot, params=params, verbose=verbose)
         return creator
@@ -367,8 +376,11 @@ class PipelinePlanner(Planner):
 
 def create_planner(name, planners=addict.Dict()):
     if len(planners) == 0:
-        planners.basemanip = BaseManipulationPlanner.create
         planners.birrt = RavePlanner.create('BiRRT')
+        planners.ompl_rrt = RavePlanner.create('OMPL_RRT')
+        planners.ompl_rrtstar = RavePlanner.create('OMPL_RRTstar')
+        planners.ompl_rrtconnect = RavePlanner.create('OMPL_RRTConnect')
+        planners.rastar = RavePlanner.create('RAStar')
         planners.basicrrt = RavePlanner.create('BasicRRT')
         planners.sbpl = RavePlanner.create('sbpl')
         planners.explorationrrt = RavePlanner.create('ExplorationRRT')
@@ -380,8 +392,6 @@ def create_planner(name, planners=addict.Dict()):
         planners.sampling = EnsemblePlanner.create(EnsemblePlanner.SAMPLING)
         planners.optimizing = TrajoptPlanner.create(1)
         planners.optimizing_multi = TrajoptPlanner.create(10)
-        planners.optimizing_multi2 = TrajoptPlanner.create(100)
-        planners.optimizing_multi3 = TrajoptPlanner.create(1000)
         planners.random_optimizing = EnsemblePlanner.create(EnsemblePlanner.OPTIMIZING)
         planners.pipeline = PipelinePlanner.create
 

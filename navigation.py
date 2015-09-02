@@ -26,6 +26,7 @@ class Navigation(printable.Printable):
         self.bounds = bound.get_bounds(self.robot, 6)
 
         self.robot_state = state.State(self.env, verbose=self.verbose)
+        self.params.motion_planning.depth = 0
         self.planner = planner.create_planner(self.params.motion_planning.planner)(
             self.robot, self.params.motion_planning, self.verbose)
         self.simulator = simulator.Simulator(

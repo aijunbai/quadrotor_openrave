@@ -16,13 +16,13 @@ __author__ = 'Aijun Bai'
 
 
 def parse_args():
-    arg_parser = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser()
 
-    arg_parser.add_argument('--verbose', action='store_true')
-    arg_parser.add_argument('--test', action='store_true')
-    arg_parser.add_argument('--params', default='params/quadrotor.yaml')
+    ap.add_argument('--verbose', action='store_true')
+    ap.add_argument('--test', action='store_true')
+    ap.add_argument('--params', default='params/quadrotor.yaml')
 
-    return arg_parser.parse_args()
+    return ap.parse_args()
 
 
 @rave.with_destroy
@@ -45,6 +45,6 @@ def run():
         navi.run()
 
 if __name__ == "__main__":
-    rave.RaveSetDebugLevel(rave.DebugLevel.Debug)
+    rave.RaveSetDebugLevel(rave.DebugLevel.Verbose)
 
     run()

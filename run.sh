@@ -33,8 +33,8 @@ if [ $TEST = "True" ]; then
 fi
 
 if [ $PROFILE = "True" ]; then
-    time $PYTHON -m cProfile -o $QUADROTOR_PROF $QUADROTOR
+    $PYTHON -m cProfile -o $QUADROTOR_PROF $QUADROTOR
     profile $QUADROTOR_PROF
 else
-    time $PYTHON $QUADROTOR
+    $PYTHON $QUADROTOR
 fi
