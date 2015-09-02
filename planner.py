@@ -49,6 +49,21 @@ class Planner(object):
         assert v.size == 6
         return np.r_[v[0:3], v[5]]
 
+    def name(self):
+        prefix = '\t' * self.params.depth
+        return '{}{} - {}'.format(prefix, self.__class__.__name__, self.params.name)
+
+    @staticmethod
+    def copy_params(creator):
+        def wrapper(robot, params, verbose):
+            params = copy.deepcopy(params)
+            if 'depth' in params:
+                params.depth += 1
+            else:
+                params.depth = 0
+            return creator(robot, params, verbose)
+        return wrapper
+
     @staticmethod
     def filter(plan):
         def wrapper(self, start, goal):
@@ -58,14 +73,21 @@ class Planner(object):
                 start = Planner.six_to_four(start)
                 goal = Planner.six_to_four(goal)
 
-            self.robot.SetActiveDOFValues(start)
-            print '{} does planning at depth {}...'.format(self.__class__.__name__, self.params.depth)
-            traj, cost = plan(self, start, goal)
+            with self.robot:
+                self.robot.SetActiveDOFValues(start)
+                print '{} - planning at depth {} for {} steps...'.format(self.name(), self.params.depth, self.params.n_steps)
+                traj, cost = plan(self, start, goal)
+
             if traj is not None:
                 if self.params.dof == 4 and traj[0].size == 4:
                     traj = Planner.four_to_six([t for t in traj])
+
+                if isinstance(traj, np.ndarray):
+                    traj = traj.tolist()
+
                 return traj, cost
             return None, None
+
         return wrapper
 
     @abc.abstractmethod
@@ -76,6 +98,7 @@ class Planner(object):
         spec = traj_obj.GetConfigurationSpecification()
         traj = []
         step = traj_obj.GetDuration() / self.params.n_steps
+
         for i in range(self.params.n_steps):
             data = traj_obj.Sample(i * step)
             T = spec.ExtractTransform(None, data, self.robot)
@@ -83,8 +106,9 @@ class Planner(object):
             euler = transformations.euler_from_quaternion(np.r_[pose[1:4], pose[0]])
             traj.append(np.r_[pose[4:7], euler[0:3]])
 
-        if check_traj.traj_is_safe(traj, self.robot):
-            return traj, traj_obj.GetDuration()
+        with self.robot:
+            if check_traj.traj_is_safe(traj, self.robot):
+                return traj, traj_obj.GetDuration()
 
         return None, None
 
@@ -95,10 +119,11 @@ class TrajoptPlanner(Planner):
 
     @staticmethod
     def create(multi_initialization):
+        @Planner.copy_params
         def creator(robot, params, verbose):
-            params = copy.deepcopy(params)
-            params.depth += 1
+            params.name = 'trajopt+{}'.format(multi_initialization)
             params.multi_initialization = multi_initialization
+            params.int_planner = 'sampling'
             return TrajoptPlanner(robot, params=params, verbose=verbose)
         return creator
 
@@ -124,7 +149,7 @@ class TrajoptPlanner(Planner):
                     }
                 },
                 {
-                    "name": "cont_coll",
+                    "": "cont_coll",
                     "type": "collision",
                     "params": {
                         "coeffs": [coll_coeff],
@@ -169,52 +194,64 @@ class TrajoptPlanner(Planner):
         if self.verbose:
             draw.draw_trajectory(self.env, inittraj, colors=np.array((0.5, 0.5, 0.5)))
 
-        with self.robot:
-            self.robot.SetActiveDOFValues(start)
-            request = self.make_fullbody_request(goal, inittraj, self.params.n_steps)
-            prob = trajoptpy.ConstructProblem(json.dumps(request), self.env)
-
-        def constraint(dofs):
-            valid = True
-            if self.params.dof == 6:
-                valid &= abs(dofs[3]) < 0.1
-                valid &= abs(dofs[4]) < 0.1
+        if self.params.n_steps > 2:
             with self.robot:
-                self.robot.SetActiveDOFValues(dofs)
-                valid &= not self.env.CheckCollision(self.robot)
-            return 0 if valid else 1
+                self.robot.SetActiveDOFValues(start)
+                request = self.make_fullbody_request(goal, inittraj, self.params.n_steps)
+                prob = trajoptpy.ConstructProblem(json.dumps(request), self.env)
 
-        for t in range(1, self.params.n_steps):
-            prob.AddConstraint(
-                constraint, [(t, j) for j in range(self.params.dof)], "EQ", "constraint%i" % t)
+                def constraint(dofs):
+                    valid = True
+                    if self.params.dof == 6:
+                        valid &= abs(dofs[3]) < 0.1
+                        valid &= abs(dofs[4]) < 0.1
+                    with self.robot:
+                        self.robot.SetActiveDOFValues(dofs)
+                        valid &= not self.env.CheckCollision(self.robot)
+                    return 0 if valid else 1
 
-        result = trajoptpy.OptimizeProblem(prob)
-        traj = result.GetTraj()
-        prob.SetRobotActiveDOFs()
+                for t in range(1, self.params.n_steps):
+                    prob.AddConstraint(
+                        constraint, [(t, j) for j in range(self.params.dof)], "EQ", "constraint%i" % t)
 
-        if traj is not None:
-            if self.verbose:
-                draw.draw_trajectory(self.env, traj)
-            if check_traj.traj_is_safe(traj, self.robot):
-                cost = sum(cost[1] for cost in result.GetCosts())
-                return traj, cost
+                result = trajoptpy.OptimizeProblem(prob)
+                traj = result.GetTraj()
+                prob.SetRobotActiveDOFs()
+
+                if traj is not None:
+                    if self.verbose:
+                        draw.draw_trajectory(self.env, traj)
+                    if check_traj.traj_is_safe(traj, self.robot):
+                        cost = sum(cost[1] for cost in result.GetCosts())
+                        return traj, cost
+        elif self.params.n_steps <= 2:
+            return [start, goal], utils.dist(start, goal)
 
         return None, None
 
+
     @property
     @memoized
-    def int_planner(self):
-        print '{} creates int_planner at depth {}...'.format(self.__class__.__name__, self.params.depth)
+    def int_planner1(self):
+        print '{} - int_planner1 at depth {}...'.format(self.name(), self.params.depth)
         params = copy.deepcopy(self.params)
         params.n_steps = self.params.n_steps // 2
-        return create_planner('optimizing')(self.robot, params=params, verbose=self.verbose)
+        return create_planner(self.params.int_planner)(self.robot, params=params, verbose=self.verbose)
 
-    def gen_waypoint(self, bounds, maxiter=10):
+    @property
+    @memoized
+    def int_planner2(self):
+        print '{} - int_planner2 at depth {}...'.format(self.name(), self.params.depth)
+        params = copy.deepcopy(self.params)
+        params.n_steps = (self.params.n_steps + 1) // 2
+        return create_planner(self.params.int_planner)(self.robot, params=params, verbose=self.verbose)
+
+    def gen_waypoint(self, bounds, maxiter=100):
         for i in range(self.params.multi_initialization):
             waypoint = None
             for j in range(maxiter):
+                waypoint = bound.sample(bounds)
                 with self.robot:
-                    waypoint = bound.sample(bounds)
                     self.robot.SetActiveDOFValues(waypoint)
                     if not self.env.CheckCollision(self.robot):
                         break
@@ -222,30 +259,30 @@ class TrajoptPlanner(Planner):
 
     @Planner.filter
     def plan(self, start, goal):
-        if self.params.multi_initialization <= 1:
-            return self.plan_with_inittraj(start, goal)
+        traj, cost = self.plan_with_inittraj(start, goal)
+        if traj is not None:
+            return traj, cost
 
         bounds = bound.get_bounds(self.robot, self.params.dof)
-        waypoint_step = self.params.n_steps // 2
         solutions = []
 
-        for waypoint in self.gen_waypoint(bounds):
+        for i, waypoint in enumerate(self.gen_waypoint(bounds)):
+            print '{} - int_planners try waypoint {} at depth {}...'.format(self.name(), i, self.params.depth)
             if self.verbose:
                 utils.pv('waypoint')
 
-            inittraj = None
-            traj1, _ = self.int_planner.plan(start, waypoint)
+            inittraj = []
+            traj1, _ = self.int_planner1.plan(start, waypoint)
             if traj1 is not None:
-                traj2, _ = self.int_planner.plan(waypoint, goal)
+                traj2, _ = self.int_planner2.plan(waypoint, goal)
                 if traj2 is not None:
-                    inittraj = np.empty((self.params.n_steps, self.params.dof))
+                    print '{} - int_planners find plans at depth {}...'.format(self.name(), self.params.depth)
                     if self.params.dof == 4:
-                        inittraj[:waypoint_step] = Planner.six_to_four([t for t in traj1])
-                        inittraj[waypoint_step:] = Planner.six_to_four([t for t in traj2])
-                    else:
-                        inittraj[:waypoint_step] = traj1
-                        inittraj[waypoint_step:] = traj2
-                if inittraj is not None:
+                        traj1 = Planner.six_to_four([t for t in traj1])
+                        traj2 = Planner.six_to_four([t for t in traj2])
+                    inittraj.extend(traj1[0:self.int_planner1.params.n_steps] + traj2[-1-self.int_planner2.params.n_steps:])
+
+                if inittraj:
                     traj, cost = self.plan_with_inittraj(start, goal, inittraj=inittraj)
                     if traj is not None:
                         solutions.append((traj, cost))
@@ -265,31 +302,33 @@ class RavePlanner(Planner):
 
     @staticmethod
     def create(rave_planner):
+        @Planner.copy_params
         def creator(robot, params, verbose):
-            params = copy.deepcopy(params)
-            params.depth += 1
+            params.name = rave_planner
             params.rave_planner = rave_planner
             return RavePlanner(robot, params=params, verbose=verbose)
 
         return creator
 
     def plan_with_smoother(self, start, goal, smoother):
-        params = rave.Planner.PlannerParameters()
-        self.robot.SetActiveDOFValues(start)
-        params.SetRobotActiveJoints(self.robot)
-        params.SetGoalConfig(goal)
+        with self.robot:
+            self.robot.SetActiveDOFValues(start)
 
-        if smoother:
-            params.SetExtraParameters(
-                """<_postprocessing planner="{}">
-                    <_nmaxiterations>40</_nmaxiterations>
-                    </_postprocessing>""".format(smoother))
+            params = rave.Planner.PlannerParameters()
+            params.SetRobotActiveJoints(self.robot)
+            params.SetGoalConfig(goal)
 
-        with self.env:
-            traj_obj = rave.RaveCreateTrajectory(self.env, '')
-            self.planner.InitPlan(self.robot, params)
-            self.planner.PlanPath(traj_obj)
-            return self.sample_traj(traj_obj)
+            if smoother:
+                params.SetExtraParameters(
+                    """<_postprocessing planner="{}">
+                        <_nmaxiterations>40</_nmaxiterations>
+                        </_postprocessing>""".format(smoother))
+
+            with self.env:
+                traj_obj = rave.RaveCreateTrajectory(self.env, '')
+                self.planner.InitPlan(self.robot, params)
+                self.planner.PlanPath(traj_obj)
+                return self.sample_traj(traj_obj)
 
     @Planner.filter
     def plan(self, start, goal):
@@ -322,9 +361,13 @@ class EnsemblePlanner(Planner):
 
     @staticmethod
     def create(kclass=0):
+        @Planner.copy_params
         def creator(robot, params, verbose):
-            params = copy.deepcopy(params)
-            params.depth += 1
+            params.name = ""
+            if kclass | EnsemblePlanner.OPTIMIZING:
+                params.name += '{optimizing}'
+            if kclass | EnsemblePlanner.SAMPLING:
+                params.name += '{sampling}'
             params.kclass = kclass
             return EnsemblePlanner(robot, params=params, verbose=verbose)
         return creator
@@ -340,7 +383,7 @@ class EnsemblePlanner(Planner):
 
 
 class PipelinePlanner(Planner):
-    def __init__(self, robot, params, verbose=False):
+    def __init__(self, robot, params=None, verbose=False):
         super(PipelinePlanner, self).__init__(robot, params=params, verbose=verbose)
 
         self.sampling = create_planner('sampling')(robot, self.params, verbose)
@@ -348,14 +391,16 @@ class PipelinePlanner(Planner):
         self.random_optimizing = create_planner('random_optimizing')(robot, self.params, verbose)
 
     @staticmethod
+    @Planner.copy_params
     def create(robot, params, verbose):
-        return PipelinePlanner(robot, params, verbose)
+        params.name = 'pipeline'
+        return PipelinePlanner(robot, params=params, verbose=verbose)
 
     @Planner.filter
     def plan(self, start, goal):
         traj, cost = self.optimizing.plan(start, goal)
         if traj is not None:
-            print 'First priority: optimizing'
+            print '{} - first priority: optimizing'.format(self.name())
             return traj, cost
 
         traj, cost = self.sampling.plan(start, goal)
@@ -365,12 +410,12 @@ class PipelinePlanner(Planner):
                 inittraj = Planner.six_to_four([t for t in inittraj])
             traj2, cost2 = self.optimizing.plan_with_inittraj(start, goal, inittraj)
             if traj2 is not None:
-                print 'Second priority: sampling->optimizing'
+                print '{} - second priority: sampling->optimizing'.format(self.name())
                 return traj2, cost2
-            print 'Third priority: sampling'
+            print '{} - third priority: sampling'.format(self.name())
             return traj, cost
 
-        print 'Fourth priority: random_optimizing'
+        print '{} - fourth priority: random_optimizing'.format(self.name())
         return self.random_optimizing.plan(start, goal)
 
 
@@ -391,7 +436,7 @@ def create_planner(name, planners=addict.Dict()):
             EnsemblePlanner.SAMPLING | EnsemblePlanner.OPTIMIZING)
         planners.sampling = EnsemblePlanner.create(EnsemblePlanner.SAMPLING)
         planners.optimizing = TrajoptPlanner.create(1)
-        planners.optimizing_multi = TrajoptPlanner.create(10)
+        planners.optimizing_multi = TrajoptPlanner.create(100)
         planners.random_optimizing = EnsemblePlanner.create(EnsemblePlanner.OPTIMIZING)
         planners.pipeline = PipelinePlanner.create
 

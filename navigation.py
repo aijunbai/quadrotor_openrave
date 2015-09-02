@@ -26,7 +26,6 @@ class Navigation(printable.Printable):
         self.bounds = bound.get_bounds(self.robot, 6)
 
         self.robot_state = state.State(self.env, verbose=self.verbose)
-        self.params.motion_planning.depth = 0
         self.planner = planner.create_planner(self.params.motion_planning.planner)(
             self.robot, self.params.motion_planning, self.verbose)
         self.simulator = simulator.Simulator(
@@ -35,6 +34,7 @@ class Navigation(printable.Printable):
     def execute_trajectory(self, traj):
         self.simulator.follow(traj)
         self.robot.SetActiveDOFValues(traj[-1])
+        time.sleep(1.0)
 
     def test(self, command_func, test_count=1, max_steps=10000):
         utils.pv('command_func', 'test_count', 'max_steps')
