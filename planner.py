@@ -229,11 +229,9 @@ class TrajoptPlanner(Planner):
 
         return None, None
 
-
     @property
     @memoized
     def int_planner1(self):
-        print '{} - int_planner1 at depth {}...'.format(self.name(), self.params.depth)
         params = copy.deepcopy(self.params)
         params.n_steps = self.params.n_steps // 2
         return create_planner(self.params.int_planner)(self.robot, params=params, verbose=self.verbose)
@@ -241,7 +239,6 @@ class TrajoptPlanner(Planner):
     @property
     @memoized
     def int_planner2(self):
-        print '{} - int_planner2 at depth {}...'.format(self.name(), self.params.depth)
         params = copy.deepcopy(self.params)
         params.n_steps = (self.params.n_steps + 1) // 2
         return create_planner(self.params.int_planner)(self.robot, params=params, verbose=self.verbose)
