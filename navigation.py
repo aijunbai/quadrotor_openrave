@@ -2,8 +2,6 @@
 
 from __future__ import division
 
-__author__ = 'Aijun Bai'
-
 import time
 import utils
 import simulator
@@ -12,8 +10,8 @@ import state
 import draw
 import planner
 import bound
-import numpy as np
-import openravepy as rave
+
+__author__ = 'Aijun Bai'
 
 
 class Navigation(printable.Printable):

@@ -19,7 +19,7 @@ def draw_pose(env, pose, colors=np.array((0, 1, 0)), reset=False):
         pose = np.r_[pose.x, pose.y, pose.z, pose.yaw]
 
     center = pose[0:3]
-    angle = pose[3]
+    angle = pose[3] if len(pose) == 4 else pose[5]
     xaxis = 0.5 * np.array((np.cos(angle), np.sin(angle), 0.0))
     yaxis = 0.25 * np.array((-np.sin(angle), np.cos(angle), 0.0))
     points = np.c_[center - xaxis, center + xaxis, center - yaxis, center + yaxis, center + xaxis,

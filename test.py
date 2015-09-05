@@ -62,7 +62,7 @@ def loop(r_f, z_f, yaw_f):
 
 
 def test(navi):
-    navi.test(twist, max_steps=10000)
+    #navi.test(twist, max_steps=10000)
     navi.test(square, max_steps=10000)
     navi.test(circle, max_steps=10000)
 

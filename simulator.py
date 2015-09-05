@@ -61,9 +61,6 @@ class Simulator(printable.Printable):
                 time.sleep(self.params.timestep)
 
     def run(self, command, max_steps=10000):
-        """
-        Run the simulation for total_time in seconds
-        """
         self.reset()
         self.set_physics_engine(on=True)
         success, step = self.simulate(command, max_steps)
@@ -100,7 +97,7 @@ class Simulator(printable.Printable):
                 break
 
             if self.params.sleep:
-                time.sleep(max(self.dt - time.time() + start, 0.0))
+                time.sleep(max(self.params.timestep - time.time() + start, 0.0))
 
         return True, step
 

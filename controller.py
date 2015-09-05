@@ -167,6 +167,7 @@ class TrajectoryController(Controller):
         self.traj_idx = 0
         self.error = params('error', 0.1)
         self.yaw_control = params('yaw_control', False)
+        self.finishing_buffer = params('finishing_buffer', 100)
         self.command = 'trajectory'
 
     def reset(self):
@@ -175,29 +176,31 @@ class TrajectoryController(Controller):
 
     def finished(self):
         return self.input_.trajectory and \
-            self.traj_idx >= len(self.input_.trajectory) - 1
+            self.traj_idx > len(self.input_.trajectory) + self.finishing_buffer
 
-    def pose(self):
-        if self.yaw_control or self.finished():
-            return self.input_.trajectory[self.traj_idx]
+    def current_target(self):
+        idx = min(self.traj_idx, len(self.input_.trajectory) - 1)
+
+        if self.yaw_control or self.traj_idx > len(self.input_.trajectory):
+            return self.input_.trajectory[idx]
         else:
-            pose_ = copy.deepcopy(self.input_.trajectory[self.traj_idx])
-            pose_.yaw = self.state.euler[2]
-            return pose_
+            pose = copy.deepcopy(self.input_.trajectory[idx])
+            pose.yaw = self.state.euler[2]
+            return pose
 
-    def np_pose(self):
-        pose_ = self.pose()
-        return np.r_[pose_.x, pose_.y, pose_.z, pose_.yaw]
+    def dist_to_target(self):
+        cur_tgt = self.current_target()
+        return utils.dist(
+            np.r_[self.state.position, self.state.euler[2]],
+            np.r_[cur_tgt.x, cur_tgt.y, cur_tgt.z, cur_tgt.yaw])
 
     def process(self):
         if self.input_.trajectory:
-            self.output.pose = self.pose()
-
-            while utils.dist(
-                    np.r_[self.state.position, self.state.euler[2]], self.np_pose()) < \
-                    self.error and \
-                    self.traj_idx < len(self.input_.trajectory) - 1:
-                    self.traj_idx += 1
-                    self.output.pose = self.pose()
-                    draw.draw_pose(self.state.env, self.output.pose)
-
+            while True:
+                self.output.pose = self.current_target()
+                if self.dist_to_target() > self.error:
+                    break
+                self.traj_idx += 1
+                if self.traj_idx > len(self.input_.trajectory):
+                    break
+            draw.draw_pose(self.state.env, self.output.pose)

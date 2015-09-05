@@ -5,13 +5,14 @@ motion_planning:
     n_steps: 30
     first_return: True
 simulator:
-    physics: False
-    sleep: False
+    physics: True
+    sleep: True
     timestep: 0.01
     controller:
         trajectory:
             yaw_control: False
             error: 0.1
+            finishing_buffer: 200
         pose:
             xy:
                 k_p: 2.0
