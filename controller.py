@@ -74,6 +74,7 @@ class Controller(printable.Printable):
 
 
 class TwistController(Controller):
+
     def __init__(self, state, params=None, verbose=False):
         super(TwistController, self).__init__(state, verbose=verbose)
 
@@ -96,15 +97,25 @@ class TwistController(Controller):
         twist_body = addict.Dict()
         twist_body.linear = self.state.to_body(self.state.twist.linear)
         twist_body.angular = self.state.to_body(self.state.twist.angular)
-        load_factor = utils.bound(self.state.load_factor, self.load_factor_limit)
+        load_factor = utils.bound(
+            self.state.load_factor,
+            self.load_factor_limit)
 
         acceleration_command = np.array([0.0, 0.0, 0.0])
         acceleration_command[0] = self.pid.linear.x.update(
-            self.input_.twist.linear.x, self.state.twist.linear[0], self.state.acceleration[0], self.dt)
+            self.input_.twist.linear.x,
+            self.state.twist.linear[0],
+            self.state.acceleration[0],
+            self.dt)
         acceleration_command[1] = self.pid.linear.y.update(
-            self.input_.twist.linear.y, self.state.twist.linear[1], self.state.acceleration[1], self.dt)
+            self.input_.twist.linear.y,
+            self.state.twist.linear[1],
+            self.state.acceleration[1],
+            self.dt)
         acceleration_command[2] = self.pid.linear.z.update(
-            self.input_.twist.linear.z, self.state.twist.linear[2], self.state.acceleration[2],
+            self.input_.twist.linear.z,
+            self.state.twist.linear[2],
+            self.state.acceleration[2],
             self.dt) + self.state.gravity
         acceleration_command_body = self.state.to_body(acceleration_command)
 
@@ -122,17 +133,26 @@ class TwistController(Controller):
 
         self.output.wrench.force.x = 0.0
         self.output.wrench.force.y = 0.0
-        self.output.wrench.force.z = self.state.mass * (
-            (acceleration_command[2] - self.state.gravity) * load_factor + self.state.gravity)
+        self.output.wrench.force.z = self.state.mass * \
+            ((acceleration_command[2] - self.state.gravity) * load_factor + self.state.gravity)
 
-        self.output.wrench.force.z = utils.bound(self.output.wrench.force.z, self.force_z_limit)
+        self.output.wrench.force.z = utils.bound(
+            self.output.wrench.force.z,
+            self.force_z_limit)
         self.output.wrench.force.z = max(self.output.wrench.force.z, 0.0)
-        self.output.wrench.torque.x = utils.bound(self.output.wrench.torque.x, self.torque_xy_limit)
-        self.output.wrench.torque.y = utils.bound(self.output.wrench.torque.y, self.torque_xy_limit)
-        self.output.wrench.torque.z = utils.bound(self.output.wrench.torque.z, self.torque_z_limit)
+        self.output.wrench.torque.x = utils.bound(
+            self.output.wrench.torque.x,
+            self.torque_xy_limit)
+        self.output.wrench.torque.y = utils.bound(
+            self.output.wrench.torque.y,
+            self.torque_xy_limit)
+        self.output.wrench.torque.z = utils.bound(
+            self.output.wrench.torque.z,
+            self.torque_z_limit)
 
 
 class PoseController(Controller):
+
     def __init__(self, state, params=None, verbose=False):
         super(PoseController, self).__init__(state, verbose=verbose)
 
@@ -147,20 +167,37 @@ class PoseController(Controller):
 
     def process(self):
         self.output.twist.linear.x = self.pid.x.update(
-            self.input_.pose.x, self.state.position[0], self.state.twist.linear[0], self.dt)
+            self.input_.pose.x,
+            self.state.position[0],
+            self.state.twist.linear[0],
+            self.dt)
         self.output.twist.linear.y = self.pid.y.update(
-            self.input_.pose.y, self.state.position[1], self.state.twist.linear[1], self.dt)
+            self.input_.pose.y,
+            self.state.position[1],
+            self.state.twist.linear[1],
+            self.dt)
         self.output.twist.linear.z = self.pid.z.update(
-            self.input_.pose.z, self.state.position[2], self.state.twist.linear[2], self.dt)
+            self.input_.pose.z,
+            self.state.position[2],
+            self.state.twist.linear[2],
+            self.dt)
         yaw_command = angles.normalize(
-            self.input_.pose.yaw, self.state.euler[2] - math.pi, self.state.euler[2] + math.pi)
+            self.input_.pose.yaw,
+            self.state.euler[2] -
+            math.pi,
+            self.state.euler[2] +
+            math.pi)
         self.output.twist.angular.z = self.pid.yaw.update(
-            yaw_command, self.state.euler[2], self.state.twist.angular[2], self.dt)
+            yaw_command,
+            self.state.euler[2],
+            self.state.twist.angular[2],
+            self.dt)
         if self.verbose:
             utils.pv('self.state.euler[2]', 'yaw_command')
 
 
 class TrajectoryController(Controller):
+
     def __init__(self, state, params=None, verbose=False):
         super(TrajectoryController, self).__init__(state, verbose=verbose)
 
