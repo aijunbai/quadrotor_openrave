@@ -1,5 +1,9 @@
 # coding=utf-8
 
+"""
+This file is inspired from hector_quadrotor <http://wiki.ros.org/hector_quadrotor/>
+"""
+
 from __future__ import division
 from __future__ import with_statement  # for python 2.5
 
