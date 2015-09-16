@@ -9,6 +9,10 @@ import sys
 import numpy as np
 from collections import defaultdict
 
+import roslib
+
+roslib.load_manifest("tf")
+
 from tf import transformations
 
 __author__ = "Aijun Bai"
@@ -18,21 +22,6 @@ __email__ = "aijunbai@gmail.com"
 
 def makehash():
     return defaultdict(makehash)
-
-
-def chain_files(file_names):
-    for file_name in file_names:
-        with open(file_name) as f:
-            for line in f:
-                yield line
-
-
-def drange(start=0.0, stop=1.0, step=0.1):
-    eps = 1.0e-6
-    r = start
-    while r < stop + eps if stop > start else r > stop - eps:
-        yield min(max(min(start, stop), r), max(start, stop))
-        r += step
 
 
 def pause():
@@ -64,10 +53,6 @@ def dist(a, b):
 
 def flatten(x):
     return [y for l in x for y in flatten(l)] if isinstance(x, list) else [x]
-
-
-def forward(*args):
-    print '\t'.join(str(i) for i in args)
 
 
 def rotate(v, q):

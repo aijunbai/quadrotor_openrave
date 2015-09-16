@@ -5,12 +5,15 @@ from __future__ import with_statement  # for python 2.5
 
 import numpy as np
 
-from tf import transformations
+import roslib
 
 import printable
 import addict
 import utils
 from memoized import memoized
+
+roslib.load_manifest("tf")
+from tf import transformations
 
 __author__ = 'Aijun Bai'
 

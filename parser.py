@@ -4,10 +4,12 @@ from __future__ import division
 from __future__ import with_statement  # for python 2.5
 
 import roslib
-roslib.load_manifest("rosparam")
 
-import rosparam
 import addict
+
+roslib.load_manifest("rosparam")
+import rosparam
+
 
 __author__ = 'Aijun Bai'
 

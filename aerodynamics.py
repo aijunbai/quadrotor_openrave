@@ -3,13 +3,14 @@
 from __future__ import division
 from __future__ import with_statement  # for python 2.5
 
-__author__ = 'Aijun Bai'
+import numpy as np
 
 import utils
 import math
 import printable
 import addict
-import numpy as np
+
+__author__ = 'Aijun Bai'
 
 
 class DragModel(printable.Printable):
@@ -104,4 +105,3 @@ class QuadrotorAerodynamics(printable.Printable):
         y[3] = self.drag_model.params.C_mxy * absoluteAngularVelocity * u[3]
         y[4] = self.drag_model.params.C_mxy * absoluteAngularVelocity * u[4]
         y[5] = self.drag_model.params.C_mz * absoluteAngularVelocity * u[5]
-
